@@ -2,15 +2,16 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import type { GetServerSideProps } from 'next'
 import { getUser } from '../lib/auth'
+import { useLang } from '../lib/useLang'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { lang, setLang } = useLang()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [lang, setLang] = useState<'ar'|'en'>('ar')
   const isAR = lang === 'ar'
 
   const handleLogin = async () => {
@@ -31,7 +32,6 @@ export default function LoginPage() {
   return (
     <div dir={isAR ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ width: 380 }}>
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, background: '#1D9E75', borderRadius: 14, marginBottom: 12, fontSize: 24 }}>🍞</div>
           <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5 }}>Bake<span style={{ color: '#1D9E75' }}>x</span></div>
@@ -46,15 +46,11 @@ export default function LoginPage() {
             {isAR ? 'أدخل بياناتك للوصول إلى النظام' : 'Enter your credentials to access the system'}
           </div>
 
-          {error && (
-            <div className="alert alert-error">
-              ⚠ {error}
-            </div>
-          )}
+          {error && <div className="alert alert-error">⚠ {error}</div>}
 
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 5 }}>{isAR ? 'اسم المستخدم' : 'Username'}</div>
-            <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder={isAR ? 'مثال: admin' : 'e.g. admin'} dir="ltr" onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+            <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder={isAR ? 'اسم المستخدم' : 'Username'} dir="ltr" onKeyDown={e => e.key === 'Enter' && handleLogin()} />
           </div>
 
           <div style={{ marginBottom: 20 }}>
@@ -74,16 +70,11 @@ export default function LoginPage() {
           <div style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: '#888' }}>
             {isAR ? 'ما عندك حساب؟ ' : "Don't have an account? "}
             <span style={{ color: '#1D9E75', cursor: 'pointer', fontWeight: 500 }} onClick={() => router.push('/register')}>
-              {isAR ? 'إنشاء حساب' : 'Register'}
+              {isAR ? 'طلب إنشاء حساب' : 'Request Account'}
             </span>
-          </div>
-
-          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '0.5px solid #e5e5e5', fontSize: 11, color: '#aaa', textAlign: 'center' }}>
-            Demo: <span style={{ fontFamily: 'monospace', color: '#555' }}>admin / 1234</span>
           </div>
         </div>
 
-        {/* Lang toggle */}
         <div style={{ textAlign: 'center', marginTop: 12, display: 'flex', justifyContent: 'center', gap: 6 }}>
           {(['ar','en'] as const).map(l => (
             <button key={l} onClick={() => setLang(l)} style={{ padding: '4px 12px', fontSize: 12, borderRadius: 6, border: '0.5px solid', cursor: 'pointer', background: lang===l?'#1D9E75':'transparent', color: lang===l?'#fff':'#888', borderColor: lang===l?'#1D9E75':'#d4d4d4' }}>

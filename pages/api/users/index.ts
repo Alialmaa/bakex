@@ -8,9 +8,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'GET') {
     const { data, error } = await supabaseAdmin
-      .from('users').select('id,name,username,role,perms,created_at').order('created_at')
+      .from('users').select('id,name,username,role,perms,status,created_at').order('created_at')
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json(data)
+  }
+
+  if (req.method === 'PUT') {
+    const { id, role, perms, status } = req.body
+    const update: any = {}
+    if (role) update.role = role
+    if (perms) update.perms = perms
+    if (status) update.status = status
+    const { error } = await supabaseAdmin.from('users').update(update).eq('id', id)
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(200).json({ success: true })
   }
 
   if (req.method === 'DELETE') {

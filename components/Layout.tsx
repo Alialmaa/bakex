@@ -1,9 +1,19 @@
-import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { T, Lang, ROLE_CONFIG } from '../lib/translations'
 
 const NAV_ICONS: Record<string, string> = {
-  dashboard: '⊞', stock: '📦', produce: '🍞', sales: '🛒', cost: '🧮', reports: '📊', users: '👥'
+  dashboard: '⊞', stock: '📦', recipes: '📋', produce: '🍞', sales: '🛒', cost: '🧮', reports: '📊', users: '👥'
+}
+
+const NAV_LABELS: Record<string, { ar: string; en: string }> = {
+  dashboard: { ar: 'لوحة التحكم', en: 'Dashboard' },
+  stock:     { ar: 'المخزون',     en: 'Inventory' },
+  recipes:   { ar: 'الوصفات',     en: 'Recipes' },
+  produce:   { ar: 'الإنتاج',     en: 'Production' },
+  sales:     { ar: 'المبيعات',    en: 'Sales' },
+  cost:      { ar: 'حاسبة الكوست', en: 'Cost Calc' },
+  reports:   { ar: 'التقارير',    en: 'Reports' },
+  users:     { ar: 'إدارة الحسابات', en: 'Users' },
 }
 
 interface LayoutProps {
@@ -19,8 +29,11 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
   const rc = ROLE_CONFIG[user?.role as keyof typeof ROLE_CONFIG]
   const isRTL = lang === 'ar'
 
-  const navKeys = Object.keys(t.nav) as Array<keyof typeof t.nav>
-  const allowed = navKeys.filter(k => user?.perms?.[k])
+  // recipes permission piggybacks on 'produce' permission
+  const allowed = Object.keys(NAV_LABELS).filter(k => {
+    if (k === 'recipes') return user?.perms?.produce
+    return user?.perms?.[k]
+  })
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -31,9 +44,7 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
 
   return (
     <div className="layout" dir={isRTL ? 'rtl' : 'ltr'}>
-      {/* Sidebar */}
       <div className={`sidebar ${isRTL ? 'sidebar-rtl' : ''}`}>
-        {/* Logo */}
         <div style={{ padding: '14px 16px 12px', borderBottom: '0.5px solid #e5e5e5', marginBottom: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 28, height: 28, background: '#1D9E75', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🍞</div>
@@ -46,7 +57,6 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
           </div>
         </div>
 
-        {/* Nav */}
         <div style={{ flex: 1, padding: '4px 0' }}>
           {allowed.map(k => (
             <div
@@ -55,26 +65,22 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
               onClick={() => router.push(k === 'dashboard' ? '/' : `/${k}`)}
             >
               <span style={{ fontSize: 15 }}>{NAV_ICONS[k]}</span>
-              {t.nav[k]}
+              {NAV_LABELS[k][lang]}
             </div>
           ))}
         </div>
 
-        {/* Bottom */}
         <div style={{ padding: '10px 14px', borderTop: '0.5px solid #e5e5e5' }}>
-          <div style={{ fontSize: 10, color: '#aaa', marginBottom: 3 }}>Bakex v1.0</div>
+          <div style={{ fontSize: 10, color: '#aaa' }}>Bakex v1.0</div>
         </div>
       </div>
 
-      {/* Main */}
       <div className="main">
-        {/* Topbar */}
         <div className="topbar">
           <div style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>
-            {t.nav[currentPage as keyof typeof t.nav] || t.nav.dashboard}
+            {NAV_LABELS[currentPage]?.[lang] || NAV_LABELS.dashboard[lang]}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Lang toggle */}
             <div style={{ display: 'flex', gap: 3 }}>
               {(['ar', 'en'] as Lang[]).map(l => (
                 <button
@@ -90,7 +96,6 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
                 >{l === 'ar' ? 'ع' : 'EN'}</button>
               ))}
             </div>
-            {/* User */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div className="avatar" style={{ width: 30, height: 30, fontSize: 12, background: rc?.bg, color: rc?.color }}>
                 {user?.name?.charAt(0)}
@@ -108,7 +113,6 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
           </div>
         </div>
 
-        {/* Content */}
         <div className="content">{children}</div>
       </div>
     </div>
