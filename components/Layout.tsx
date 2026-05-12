@@ -2,12 +2,13 @@ import { useRouter } from 'next/router'
 import { T, Lang, ROLE_CONFIG } from '../lib/translations'
 
 const NAV_ICONS: Record<string, string> = {
-  dashboard: '⊞', stock: '📦', recipes: '📋', produce: '🍞', sales: '🛒', cost: '🧮', reports: '📊', users: '👥'
+  dashboard: '⊞', stock: '📦', purchases: '🛍️', recipes: '📋', produce: '🍞', sales: '🛒', cost: '🧮', reports: '📊', users: '👥'
 }
 
 const NAV_LABELS: Record<string, { ar: string; en: string }> = {
   dashboard: { ar: 'لوحة التحكم', en: 'Dashboard' },
   stock:     { ar: 'المخزون',     en: 'Inventory' },
+  purchases: { ar: 'المشتريات',   en: 'Purchases' },
   recipes:   { ar: 'الوصفات',     en: 'Recipes' },
   produce:   { ar: 'الإنتاج',     en: 'Production' },
   sales:     { ar: 'المبيعات',    en: 'Sales' },
@@ -32,6 +33,7 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
   // recipes permission piggybacks on 'produce' permission
   const allowed = Object.keys(NAV_LABELS).filter(k => {
     if (k === 'recipes') return user?.perms?.produce
+    if (k === 'purchases') return user?.perms?.stock
     return user?.perms?.[k]
   })
 
