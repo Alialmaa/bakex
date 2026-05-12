@@ -194,10 +194,11 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
 
         {/* Table */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 120px 100px 100px 100px auto', gap: 8, padding: '10px 16px', borderBottom: '0.5px solid #d4d4d4', fontSize: 11, color: '#888', fontWeight: 500 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 120px 90px 100px 100px 100px auto', gap: 8, padding: '10px 16px', borderBottom: '0.5px solid #d4d4d4', fontSize: 11, color: '#888', fontWeight: 500 }}>
             <span>{lang === 'ar' ? 'الوصفة' : 'Recipe'}</span>
             <span>{lang === 'ar' ? 'الإنتاج' : 'Output'}</span>
             <span>{lang === 'ar' ? 'سعر البيع' : 'Sell Price'}</span>
+            <span>{lang === 'ar' ? 'كوست الصينية' : 'Batch Cost'}</span>
             <span>{lang === 'ar' ? 'كوست الحبة' : 'Unit Cost'}</span>
             <span>{lang === 'ar' ? 'هامش' : 'Margin'}</span>
             <span></span>
@@ -208,6 +209,7 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
                 {lang === 'ar' ? 'لا توجد وصفات. اضغط "+ وصفة جديدة".' : 'No recipes. Click "+ New Recipe".'}
               </div>
             ) : recipes.map(r => {
+              const bc = getBatchCost(r)
               const uc = getUnitCost(r)
               const sp = r.sell_price || 0
               const margin = sp > 0 ? ((sp - uc) / sp * 100) : null
@@ -215,7 +217,7 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
               const batchUnit = r.batch_unit || r.output_unit
               const unitsPerBatch = r.units_per_batch || r.output_qty
               return (
-                <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 120px 100px 100px 100px auto', gap: 8, alignItems: 'center', padding: '12px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
+                <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 120px 90px 100px 100px 100px auto', gap: 8, alignItems: 'center', padding: '12px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
                   <div>
                     <div style={{ fontWeight: 500 }}>{r.name}</div>
                     <div style={{ fontSize: 10, color: '#888' }}>{(r.ingredients || []).length} {lang === 'ar' ? 'مكون' : 'ingredients'}</div>
@@ -224,6 +226,7 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
                     <div style={{ fontSize: 12 }}>{batchUnit} ← {unitsPerBatch} {r.output_unit}</div>
                   </div>
                   <span>{sp > 0 ? `${sp.toFixed(2)} ${t.currency}` : '—'}</span>
+                  <span style={{ color: '#888' }}>{bc.toFixed(2)} {t.currency}</span>
                   <span style={{ color: '#888' }}>{uc.toFixed(3)} {t.currency}</span>
                   <span style={{ color: mc, fontWeight: 500 }}>{margin !== null ? margin.toFixed(0) + '%' : '—'}</span>
                   <div style={{ display: 'flex', gap: 4 }}>

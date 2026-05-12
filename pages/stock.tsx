@@ -9,11 +9,11 @@ import { useLang } from '../lib/useLang'
 export default function StockPage({ user, initialStock }: any) {
   const { lang, setLang } = useLang()
   const [stock, setStock] = useState<any[]>(initialStock || [])
-  const [form, setForm] = useState({
-    name: '', qty: '', unit: 'غرام', min_qty: '',
-    packWeight: '', packPrice: '', price_per_unit: ''
-  })
-  const [usePackCalc, setUsePackCalc] = useState(true)
+  const [editItem, setEditItem] = useState<any>(null)
+  const [editForm, setEditForm] = useState({ qty: '', min_qty: '', price_per_unit: '', packWeight: '', packPrice: '' })
+  const [usePackCalc, setUsePackCalc] = useState(false)
+  const [addForm, setAddForm] = useState({ name: '', qty: '', unit: 'غرام', min_qty: '', packWeight: '', packPrice: '', price_per_unit: '' })
+  const [addPackCalc, setAddPackCalc] = useState(true)
   const [saving, setSaving] = useState(false)
   const t = T[lang]
 
@@ -22,53 +22,82 @@ export default function StockPage({ user, initialStock }: any) {
     if (res.ok) setStock(await res.json())
   }
 
-  // Calculate price per gram from pack
-  const calcPricePerGram = () => {
-    const w = parseFloat(form.packWeight)
-    const p = parseFloat(form.packPrice)
-    if (w > 0 && p > 0) return (p / w).toFixed(4)
+  const openEdit = (item: any) => {
+    setEditItem(item)
+    setEditForm({
+      qty: String(item.qty ?? ''),
+      min_qty: String(item.min_qty ?? ''),
+      price_per_unit: String(item.price_per_unit ?? ''),
+      packWeight: '',
+      packPrice: ''
+    })
+    setUsePackCalc(false)
+  }
+
+  const saveEdit = async () => {
+    if (!editItem) return
+    let price = parseFloat(editForm.price_per_unit) || 0
+    if (usePackCalc) {
+      const w = parseFloat(editForm.packWeight)
+      const p = parseFloat(editForm.packPrice)
+      if (w > 0 && p > 0) price = p / w
+    }
+    setSaving(true)
+    await fetch('/api/stock', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: editItem.id,
+        qty: parseFloat(editForm.qty) || 0,
+        min_qty: parseFloat(editForm.min_qty) || 0,
+        price_per_unit: price
+      })
+    })
+    setStock(stock.map(s => s.id === editItem.id ? {
+      ...s,
+      qty: parseFloat(editForm.qty) || 0,
+      min_qty: parseFloat(editForm.min_qty) || 0,
+      price_per_unit: price
+    } : s))
+    setEditItem(null)
+    setSaving(false)
+  }
+
+  const calcAddPrice = () => {
+    const w = parseFloat(addForm.packWeight)
+    const p = parseFloat(addForm.packPrice)
+    if (w > 0 && p > 0) return (p / w).toFixed(6)
+    return ''
+  }
+
+  const calcEditPrice = () => {
+    const w = parseFloat(editForm.packWeight)
+    const p = parseFloat(editForm.packPrice)
+    if (w > 0 && p > 0) return (p / w).toFixed(6)
     return ''
   }
 
   const addMaterial = async () => {
-    if (!form.name || !form.qty) return
-    let pricePerUnit = parseFloat(form.price_per_unit) || 0
-    if (usePackCalc) {
-      const w = parseFloat(form.packWeight)
-      const p = parseFloat(form.packPrice)
-      if (w > 0 && p > 0) pricePerUnit = p / w
+    if (!addForm.name || !addForm.qty) return
+    let price = parseFloat(addForm.price_per_unit) || 0
+    if (addPackCalc) {
+      const w = parseFloat(addForm.packWeight)
+      const p = parseFloat(addForm.packPrice)
+      if (w > 0 && p > 0) price = p / w
     }
     setSaving(true)
     await fetch('/api/stock', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: form.name, qty: parseFloat(form.qty),
-        unit: form.unit, min_qty: parseFloat(form.min_qty) || 0,
-        price_per_unit: pricePerUnit
-      })
+      body: JSON.stringify({ name: addForm.name, qty: parseFloat(addForm.qty), unit: addForm.unit, min_qty: parseFloat(addForm.min_qty) || 0, price_per_unit: price })
     })
     await refresh()
-    setForm({ name: '', qty: '', unit: 'غرام', min_qty: '', packWeight: '', packPrice: '', price_per_unit: '' })
+    setAddForm({ name: '', qty: '', unit: 'غرام', min_qty: '', packWeight: '', packPrice: '', price_per_unit: '' })
     setSaving(false)
-  }
-
-  const updateField = async (id: string, field: string, value: number) => {
-    await fetch('/api/stock', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, [field]: value })
-    })
-    setStock(stock.map(s => s.id === id ? { ...s, [field]: value } : s))
-  }
-
-  const updateQty = async (id: string, qty: number) => {
-    await fetch('/api/stock', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, qty }) })
-    setStock(stock.map(s => s.id === id ? { ...s, qty } : s))
   }
 
   const deleteMat = async (id: string) => {
     if (!confirm(lang === 'ar' ? 'حذف المادة؟' : 'Delete material?')) return
     await fetch('/api/stock', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    await refresh()
+    setStock(stock.filter(s => s.id !== id))
   }
 
   const getStatus = (item: any) => {
@@ -77,10 +106,11 @@ export default function StockPage({ user, initialStock }: any) {
     return { label: t.stock.ok, cls: 'tag-green' }
   }
 
-  const totalValue = stock.reduce((s, m) => s + m.qty * m.price_per_unit, 0)
+  const totalValue = stock.reduce((s, m) => s + (m.qty || 0) * (m.price_per_unit || 0), 0)
   const lowCount = stock.filter(m => m.min_qty > 0 && m.qty < m.min_qty).length
   const emptyCount = stock.filter(m => m.qty <= 0).length
-  const pricePerGram = calcPricePerGram()
+  const addPriceCalc = calcAddPrice()
+  const editPriceCalc = calcEditPrice()
 
   return (
     <Layout user={user} lang={lang} setLang={setLang}>
@@ -89,10 +119,7 @@ export default function StockPage({ user, initialStock }: any) {
         {/* Summary */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
           <div className="metric"><div className="metric-label">{lang === 'ar' ? 'الأصناف' : 'Items'}</div><div className="metric-value">{stock.length}</div></div>
-          <div className="metric">
-            <div className="metric-label">{lang === 'ar' ? 'قيمة المخزون' : 'Stock Value'}</div>
-            <div className="metric-value" style={{ fontSize: 16 }}>{totalValue.toFixed(0)} <span style={{ fontSize: 12, fontWeight: 400 }}>{t.currency}</span></div>
-          </div>
+          <div className="metric"><div className="metric-label">{lang === 'ar' ? 'قيمة المخزون' : 'Stock Value'}</div><div className="metric-value" style={{ fontSize: 16 }}>{totalValue.toFixed(0)} <span style={{ fontSize: 12, fontWeight: 400 }}>{t.currency}</span></div></div>
           <div style={{ background: lowCount ? '#FAEEDA' : '#f5f5f3', borderRadius: 8, padding: '12px 14px' }}>
             <div className="metric-label" style={{ color: lowCount ? '#854F0B' : '' }}>{t.stock.low}</div>
             <div className="metric-value" style={{ color: lowCount ? '#854F0B' : '' }}>{lowCount}</div>
@@ -103,54 +130,121 @@ export default function StockPage({ user, initialStock }: any) {
           </div>
         </div>
 
+        {/* Edit Modal */}
+        {editItem && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }} onClick={e => e.target === e.currentTarget && setEditItem(null)}>
+            <div className="card" style={{ width: 440, maxWidth: '100%' }} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div style={{ fontSize: 15, fontWeight: 500 }}>{lang === 'ar' ? 'تعديل:' : 'Edit:'} {editItem.name}</div>
+                <button onClick={() => setEditItem(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#888' }}>×</button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 5 }}>{lang === 'ar' ? `الكمية (${editItem.unit})` : `Qty (${editItem.unit})`}</div>
+                  <input
+                    type="number"
+                    value={editForm.qty}
+                    onChange={e => setEditForm({ ...editForm, qty: e.target.value })}
+                    placeholder="0"
+                    step="0.01"
+                    style={{ fontSize: 16 }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 5 }}>{lang === 'ar' ? `الحد الأدنى (${editItem.unit})` : `Min qty (${editItem.unit})`}</div>
+                  <input
+                    type="number"
+                    value={editForm.min_qty}
+                    onChange={e => setEditForm({ ...editForm, min_qty: e.target.value })}
+                    placeholder="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 8 }}>{lang === 'ar' ? 'السعر' : 'Price'}</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <button onClick={() => setUsePackCalc(false)} style={{ padding: '5px 12px', fontSize: 12, borderRadius: 6, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: !usePackCalc ? '#E1F5EE' : 'transparent', color: !usePackCalc ? '#085041' : '#888', borderColor: !usePackCalc ? '#1D9E75' : '#d4d4d4' }}>
+                    {lang === 'ar' ? 'أدخل السعر مباشرة' : 'Direct price'}
+                  </button>
+                  <button onClick={() => setUsePackCalc(true)} style={{ padding: '5px 12px', fontSize: 12, borderRadius: 6, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: usePackCalc ? '#E1F5EE' : 'transparent', color: usePackCalc ? '#085041' : '#888', borderColor: usePackCalc ? '#1D9E75' : '#d4d4d4' }}>
+                    {lang === 'ar' ? 'احسب من العبوة' : 'From pack'}
+                  </button>
+                </div>
+
+                {!usePackCalc ? (
+                  <div>
+                    <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? `سعر الـ${editItem.unit} الواحد (ر.س)` : `Price per ${editItem.unit} (SAR)`}</div>
+                    <input
+                      type="number"
+                      value={editForm.price_per_unit}
+                      onChange={e => setEditForm({ ...editForm, price_per_unit: e.target.value })}
+                      placeholder="0.000000"
+                      step="0.000001"
+                    />
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? `وزن العبوة (${editItem.unit})` : `Pack weight (${editItem.unit})`}</div>
+                      <input type="number" value={editForm.packWeight} onChange={e => setEditForm({ ...editForm, packWeight: e.target.value })} placeholder="5000" step="0.01" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'سعر العبوة (ر.س)' : 'Pack price (SAR)'}</div>
+                      <input type="number" value={editForm.packPrice} onChange={e => setEditForm({ ...editForm, packPrice: e.target.value })} placeholder="305" step="0.01" />
+                    </div>
+                    {editPriceCalc && (
+                      <div style={{ gridColumn: '1/-1', background: '#E1F5EE', padding: '8px 12px', borderRadius: 8, fontSize: 12, color: '#085041' }}>
+                        = <strong>{parseFloat(editPriceCalc).toFixed(6)}</strong> {t.currency}/{editItem.unit}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center', padding: '11px 0' }} onClick={saveEdit} disabled={saving}>
+                  {saving ? '...' : (lang === 'ar' ? 'حفظ' : 'Save')}
+                </button>
+                <button className="btn" style={{ padding: '11px 16px' }} onClick={() => setEditItem(null)}>
+                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Stock table */}
-        <div className="card" style={{ padding: 0, overflow: 'auto' }}>
-          <div style={{ minWidth: 700 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 110px 70px 80px 130px 90px 80px', gap: 8, padding: '8px 16px', borderBottom: '0.5px solid #d4d4d4', fontSize: 11, color: '#888', fontWeight: 500 }}>
+        <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+          <div style={{ minWidth: 600 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 90px 70px 120px 90px 80px 80px', gap: 8, padding: '8px 16px', borderBottom: '0.5px solid #d4d4d4', fontSize: 11, color: '#888', fontWeight: 500 }}>
               <span>{t.stock.material}</span>
               <span>{t.stock.qty}</span>
               <span>{t.stock.unit}</span>
-              <span>{lang === 'ar' ? 'الحد الأدنى' : 'Min'}</span>
-              <span>{lang === 'ar' ? 'سعر الوحدة (ر.س)' : 'Unit Price (SAR)'}</span>
+              <span>{lang === 'ar' ? 'سعر الوحدة' : 'Unit Price'}</span>
               <span>{lang === 'ar' ? 'القيمة' : 'Value'}</span>
               <span>{t.stock.status}</span>
+              <span></span>
             </div>
             <div style={{ padding: '0 16px' }}>
               {stock.map(item => {
                 const st = getStatus(item)
                 return (
-                  <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1.8fr 110px 70px 80px 130px 90px 80px', gap: 8, alignItems: 'center', padding: '10px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
+                  <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1.8fr 90px 70px 120px 90px 80px 80px', gap: 8, alignItems: 'center', padding: '10px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
                     <span style={{ fontWeight: 500 }}>{item.name}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <button onClick={() => updateQty(item.id, Math.max(0, item.qty - 1))} style={{ width: 22, height: 22, borderRadius: 5, border: '0.5px solid #d4d4d4', background: '#f5f5f3', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-                      <span style={{ minWidth: 32, textAlign: 'center', fontWeight: 500, fontSize: 12 }}>{item.qty}</span>
-                      <button onClick={() => updateQty(item.id, item.qty + 1)} style={{ width: 22, height: 22, borderRadius: 5, border: '0.5px solid #d4d4d4', background: '#f5f5f3', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-                    </div>
+                    <span style={{ fontWeight: 500, color: item.qty <= 0 ? '#A32D2D' : '#333' }}>{item.qty}</span>
                     <span style={{ color: '#888', fontSize: 12 }}>{item.unit}</span>
-                    <input
-                      type="number"
-                      defaultValue={item.min_qty ?? 0}
-                      key={`min-${item.id}-${item.min_qty}`}
-                      style={{ width: 65, padding: '4px 6px' }}
-                      onBlur={e => updateField(item.id, 'min_qty', parseFloat(e.target.value) || 0)}
-                    />
                     <div>
-                      <input
-                        type="number"
-                        defaultValue={item.price_per_unit ?? 0}
-                        key={`price-${item.id}-${item.price_per_unit}`}
-                        style={{ width: 90, padding: '4px 6px' }}
-                        step="0.0001"
-                        onBlur={e => updateField(item.id, 'price_per_unit', parseFloat(e.target.value) || 0)}
-                      />
-                      <div style={{ fontSize: 9, color: '#aaa', marginTop: 2 }}>
-                        {lang === 'ar' ? `ر.س/${item.unit}` : `SAR/${item.unit}`}
-                      </div>
+                      <div style={{ fontSize: 12 }}>{(item.price_per_unit || 0).toFixed(4)} {t.currency}</div>
+                      <div style={{ fontSize: 9, color: '#aaa' }}>{t.currency}/{item.unit}</div>
                     </div>
-                    <span style={{ color: '#888', fontSize: 11 }}>{(item.qty * item.price_per_unit).toFixed(1)} {t.currency}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span className={`tag ${st.cls}`} style={{ fontSize: 10 }}>{st.label}</span>
-                      <button onClick={() => deleteMat(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E24B4A', padding: 2, fontSize: 13 }}>🗑</button>
+                    <span style={{ color: '#888', fontSize: 11 }}>{((item.qty || 0) * (item.price_per_unit || 0)).toFixed(1)} {t.currency}</span>
+                    <span className={`tag ${st.cls}`} style={{ fontSize: 10 }}>{st.label}</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => openEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1D9E75', fontSize: 14, padding: 4 }}>✏️</button>
+                      <button onClick={() => deleteMat(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E24B4A', fontSize: 14, padding: 4 }}>🗑</button>
                     </div>
                   </div>
                 )
@@ -163,19 +257,18 @@ export default function StockPage({ user, initialStock }: any) {
             <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 10, color: '#555' }}>
               {lang === 'ar' ? '+ إضافة مادة جديدة' : '+ Add new material'}
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 70px 80px', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 90px 80px', gap: 8, marginBottom: 10 }}>
               <div>
-                <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'اسم المادة' : 'Material name'}</div>
-                <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={lang === 'ar' ? 'مثال: شوكلت داكنة' : 'e.g. Dark chocolate'} />
+                <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'اسم المادة' : 'Material'}</div>
+                <input type="text" value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} placeholder={lang === 'ar' ? 'مثال: شوكلت' : 'e.g. Chocolate'} />
               </div>
               <div>
                 <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'الكمية' : 'Qty'}</div>
-                <input type="number" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })} placeholder="0" />
+                <input type="number" value={addForm.qty} onChange={e => setAddForm({ ...addForm, qty: e.target.value })} placeholder="0" />
               </div>
               <div>
                 <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'الوحدة' : 'Unit'}</div>
-                <select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} style={{ padding: '8px 6px' }}>
+                <select value={addForm.unit} onChange={e => setAddForm({ ...addForm, unit: e.target.value })} style={{ padding: '8px 6px' }}>
                   <option value="غرام">غرام</option>
                   <option value="كجم">كجم</option>
                   <option value="لتر">لتر</option>
@@ -185,47 +278,40 @@ export default function StockPage({ user, initialStock }: any) {
                 </select>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'الحد الأدنى' : 'Min qty'}</div>
-                <input type="number" value={form.min_qty} onChange={e => setForm({ ...form, min_qty: e.target.value })} placeholder="0" />
+                <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'الحد الأدنى' : 'Min'}</div>
+                <input type="number" value={addForm.min_qty} onChange={e => setAddForm({ ...addForm, min_qty: e.target.value })} placeholder="0" />
               </div>
             </div>
 
-            {/* Price method toggle */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <button
-                onClick={() => setUsePackCalc(true)}
-                style={{ padding: '5px 12px', fontSize: 12, borderRadius: 6, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: usePackCalc ? '#E1F5EE' : 'transparent', color: usePackCalc ? '#085041' : '#888', borderColor: usePackCalc ? '#1D9E75' : '#d4d4d4' }}
-              >
-                {lang === 'ar' ? '📦 احسب من العبوة' : '📦 Calculate from pack'}
+              <button onClick={() => setAddPackCalc(true)} style={{ padding: '5px 12px', fontSize: 12, borderRadius: 6, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: addPackCalc ? '#E1F5EE' : 'transparent', color: addPackCalc ? '#085041' : '#888', borderColor: addPackCalc ? '#1D9E75' : '#d4d4d4' }}>
+                {lang === 'ar' ? 'احسب من العبوة' : 'From pack'}
               </button>
-              <button
-                onClick={() => setUsePackCalc(false)}
-                style={{ padding: '5px 12px', fontSize: 12, borderRadius: 6, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: !usePackCalc ? '#E1F5EE' : 'transparent', color: !usePackCalc ? '#085041' : '#888', borderColor: !usePackCalc ? '#1D9E75' : '#d4d4d4' }}
-              >
-                {lang === 'ar' ? '✏️ أدخل السعر مباشرة' : '✏️ Enter price directly'}
+              <button onClick={() => setAddPackCalc(false)} style={{ padding: '5px 12px', fontSize: 12, borderRadius: 6, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: !addPackCalc ? '#E1F5EE' : 'transparent', color: !addPackCalc ? '#085041' : '#888', borderColor: !addPackCalc ? '#1D9E75' : '#d4d4d4' }}>
+                {lang === 'ar' ? 'أدخل السعر مباشرة' : 'Direct price'}
               </button>
             </div>
 
-            {usePackCalc ? (
+            {addPackCalc ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, marginBottom: 10, alignItems: 'end' }}>
                 <div>
-                  <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'وزن العبوة (بنفس الوحدة المختارة)' : 'Pack weight (same unit)'}</div>
-                  <input type="number" value={form.packWeight} onChange={e => setForm({ ...form, packWeight: e.target.value })} placeholder={lang === 'ar' ? 'مثال: 5000 غرام' : 'e.g. 5000'} step="0.01" />
+                  <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'وزن العبوة (بنفس الوحدة)' : 'Pack weight'}</div>
+                  <input type="number" value={addForm.packWeight} onChange={e => setAddForm({ ...addForm, packWeight: e.target.value })} placeholder="5000" step="0.01" />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'سعر العبوة (ر.س)' : 'Pack price (SAR)'}</div>
-                  <input type="number" value={form.packPrice} onChange={e => setForm({ ...form, packPrice: e.target.value })} placeholder={lang === 'ar' ? 'مثال: 305' : 'e.g. 305'} step="0.01" />
+                  <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? 'سعر العبوة (ر.س)' : 'Pack price'}</div>
+                  <input type="number" value={addForm.packPrice} onChange={e => setAddForm({ ...addForm, packPrice: e.target.value })} placeholder="305" step="0.01" />
                 </div>
-                {pricePerGram && (
+                {addPriceCalc && (
                   <div style={{ background: '#E1F5EE', padding: '8px 12px', borderRadius: 8, fontSize: 12, color: '#085041', whiteSpace: 'nowrap' }}>
-                    = <strong>{pricePerGram}</strong> {lang === 'ar' ? `ر.س/${form.unit}` : `SAR/${form.unit}`}
+                    = <strong>{parseFloat(addPriceCalc).toFixed(4)}</strong> {t.currency}/{addForm.unit}
                   </div>
                 )}
               </div>
             ) : (
               <div style={{ marginBottom: 10, maxWidth: 200 }}>
-                <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? `سعر الوحدة (ر.س/${form.unit})` : `Unit price (SAR/${form.unit})`}</div>
-                <input type="number" value={form.price_per_unit} onChange={e => setForm({ ...form, price_per_unit: e.target.value })} placeholder="0.0000" step="0.0001" />
+                <div style={{ fontSize: 10, color: '#888', marginBottom: 3 }}>{lang === 'ar' ? `سعر الـ${addForm.unit} الواحد` : `Price per ${addForm.unit}`}</div>
+                <input type="number" value={addForm.price_per_unit} onChange={e => setAddForm({ ...addForm, price_per_unit: e.target.value })} placeholder="0.000000" step="0.000001" />
               </div>
             )}
 
