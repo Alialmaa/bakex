@@ -61,6 +61,31 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
     return units > 0 ? total / units : 0
   }
 
+  // Calculate max batches possible from current stock
+  const maxBatches = (recipe: any) => {
+    if (!recipe.ingredients?.length) return 0
+    let max = Infinity
+    for (const ing of recipe.ingredients) {
+      const m = getStk(ing.material)
+      if (!m || ing.amount <= 0) return 0
+      max = Math.min(max, Math.floor(m.qty / ing.amount))
+    }
+    return max === Infinity ? 0 : max
+  }
+
+  const limitingIngredient = (recipe: any) => {
+    if (!recipe.ingredients?.length) return null
+    let min = Infinity
+    let limiting = null
+    for (const ing of recipe.ingredients) {
+      const m = getStk(ing.material)
+      if (!m || ing.amount <= 0) return ing.material
+      const possible = Math.floor(m.qty / ing.amount)
+      if (possible < min) { min = possible; limiting = ing.material }
+    }
+    return limiting
+  }
+
   const produce = async (recipe: any) => {
     const b = batches[recipe.id] || 1
     if (!canMake(recipe, b)) return
@@ -156,15 +181,49 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
               const units = r.units_per_batch || r.output_qty || 1
               return (
                 <div key={r.id} className="card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 500 }}>{r.name}</div>
                       <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
                         {r.batch_unit || 'صينية'} ← {units} {r.output_unit}
                       </div>
                     </div>
-                    <span className="tag tag-gray" style={{ fontSize: 11 }}>{uc.toFixed(3)} {t.currency}/{r.output_unit}</span>
+                    <span className="tag tag-gray" style={{ fontSize: 11, marginRight: 'auto', marginLeft: 'auto' }}>{uc.toFixed(3)} {t.currency}/{r.output_unit}</span>
                   </div>
+
+                  {/* Max batches indicator */}
+                  {(() => {
+                    const max = maxBatches(r)
+                    const lim = limitingIngredient(r)
+                    const maxUnits = max * units
+                    const color = max === 0 ? '#A32D2D' : max < 3 ? '#854F0B' : '#3B6D11'
+                    const bg = max === 0 ? '#FCEBEB' : max < 3 ? '#FAEEDA' : '#E1F5EE'
+                    return (
+                      <div style={{ background: bg, borderRadius: 8, padding: '8px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: 11, color, fontWeight: 500 }}>
+                            {max === 0
+                              ? (lang === 'ar' ? '⚠ المخزون لا يكفي' : '⚠ Insufficient stock')
+                              : (lang === 'ar' ? `✓ تقدر تنتج ${max} ${r.batch_unit || 'صينية'}` : `✓ Can produce ${max} batches`)}
+                          </div>
+                          {max > 0 && (
+                            <div style={{ fontSize: 10, color, marginTop: 2 }}>
+                              = {maxUnits} {r.output_unit}
+                              {lim && ` · ${lang === 'ar' ? 'المحدد:' : 'Limited by:'} ${lim}`}
+                            </div>
+                          )}
+                        </div>
+                        {max > 0 && (
+                          <button
+                            onClick={() => setBatches({ ...batches, [r.id]: max })}
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', color, borderColor: color }}
+                          >
+                            {lang === 'ar' ? 'استخدم الكل' : 'Use max'}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
                     {r.ingredients?.map((ing: any) => {
