@@ -21,7 +21,7 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
   const recordSales = async () => {
     const entries = recipes.filter(r => (qtys[r.id] || 0) > 0).map(r => ({
       recipe_id: r.id, recipe_name: r.name, qty: qtys[r.id],
-      unit_price: prices[r.id] || 0, total: (qtys[r.id] || 0) * (prices[r.id] || 0),
+      unit_price: r.sell_price || 0, total: (qtys[r.id] || 0) * (r.sell_price || 0),
     }))
     if (!entries.length) return
     setSaving(true)
@@ -84,8 +84,24 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
             <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 90px', gap: 8, padding: '10px 0', borderBottom: '0.5px solid #e5e5e5', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 500 }}>{r.name}</span>
               <span style={{ fontSize: 12, color: '#888' }}>{r.output_unit}</span>
-              <input type="number" value={prices[r.id] || 0} min={0} step={0.5} onChange={e => setPrices({ ...prices, [r.id]: parseFloat(e.target.value) || 0 })} style={{ width: 90, padding: '5px 8px' }} />
-              <input type="number" value={qtys[r.id] || 0} min={0} onChange={e => setQtys({ ...qtys, [r.id]: parseInt(e.target.value) || 0 })} style={{ width: 70, padding: '5px 8px' }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#1D9E75' }}>{(r.sell_price || 0).toFixed(2)} {t.currency}</span>
+              <input
+                type="number"
+                value={qtys[r.id] ?? ''}
+                min={0}
+                placeholder="0"
+                onChange={e => {
+                  const val = e.target.value
+                  if (val === '' || val === '0') {
+                    const copy = { ...qtys }
+                    delete copy[r.id]
+                    setQtys(copy)
+                  } else {
+                    setQtys({ ...qtys, [r.id]: parseInt(val) || 0 })
+                  }
+                }}
+                style={{ width: 70, padding: '5px 8px' }}
+              />
             </div>
           ))}
           <button onClick={recordSales} disabled={saving} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12, padding: '11px 0' }}>
