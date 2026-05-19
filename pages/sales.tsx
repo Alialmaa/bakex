@@ -96,12 +96,19 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
         <div className="card">
           <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 10 }}>{t.sales.log}</div>
           {sales.length === 0 ? <div style={{ color: '#888', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>{t.sales.noSales}</div>
-            : sales.slice(0, 15).map((s, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
+            : sales.slice(0, 50).map((s, i) => (
+              <div key={s.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
                 <span>{s.recipe_name} × {s.qty}</span>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 500 }}>{s.total?.toFixed(2)} {t.currency}</div>
-                  <div style={{ fontSize: 11, color: '#888' }}>{new Date(s.created_at).toLocaleString()}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 500 }}>{s.total?.toFixed(2)} {t.currency}</div>
+                    <div style={{ fontSize: 11, color: '#888' }}>{new Date(s.created_at).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en')} {new Date(s.created_at).toLocaleTimeString(lang === 'ar' ? 'ar' : 'en', { hour: '2-digit', minute: '2-digit' })}</div>
+                  </div>
+                  <button onClick={async () => {
+                    if (!confirm(lang === 'ar' ? 'حذف هذه المبيعة؟' : 'Delete this sale?')) return
+                    const res = await fetch('/api/sales', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) })
+                    if (res.ok) setSales(sales.filter(x => x.id !== s.id))
+                  }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E24B4A', fontSize: 14, padding: 4 }}>🗑</button>
                 </div>
               </div>
             ))}

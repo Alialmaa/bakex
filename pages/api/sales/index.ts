@@ -25,5 +25,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(data)
   }
 
+  if (req.method === 'DELETE') {
+    const { id } = req.body
+    await supabaseAdmin.from('sales').delete().eq('id', id)
+    return res.status(200).json({ success: true })
+  }
+
   res.status(405).end()
 }
