@@ -17,8 +17,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'POST') {
-    const { entries } = req.body // [{ recipe_id, recipe_name, qty, unit_price, total }]
-    const rows = entries.map((e: any) => ({ ...e, sold_by: user.id }))
+    const { entries, date } = req.body
+    const created_at = date ? new Date(date + 'T12:00:00').toISOString() : new Date().toISOString()
+    const rows = entries.map((e: any) => ({ ...e, sold_by: user.id, created_at }))
     const { data, error } = await supabaseAdmin.from('sales').insert(rows).select()
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json(data)

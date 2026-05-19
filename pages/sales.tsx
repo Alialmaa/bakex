@@ -15,6 +15,7 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
     Object.fromEntries((initialRecipes || []).map((r: any) => [r.id, r.sell_price || 0]))
   )
   const [saving, setSaving] = useState(false)
+  const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
   const t = T[lang]
 
   const recordSales = async () => {
@@ -26,7 +27,7 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
     setSaving(true)
     const res = await fetch('/api/sales', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entries }),
+      body: JSON.stringify({ entries, date: saleDate }),
     })
     if (res.ok) { const d = await res.json(); setSales([...d, ...sales]); setQtys({}) }
     setSaving(false)
@@ -58,6 +59,21 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
 
         <div className="card">
           <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>{t.sales.recordToday}</div>
+
+          {/* Date selector */}
+          <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: 12, color: '#666', fontWeight: 500 }}>{lang === 'ar' ? 'تاريخ المبيعات:' : 'Sale date:'}</div>
+            <input
+              type="date"
+              value={saleDate}
+              max={new Date().toISOString().split('T')[0]}
+              onChange={e => setSaleDate(e.target.value)}
+              style={{ padding: '6px 10px', borderRadius: 8, border: '0.5px solid #d4d4d4', fontSize: 13, fontFamily: 'inherit', width: 'auto' }}
+            />
+            {saleDate !== new Date().toISOString().split('T')[0] && (
+              <span className="tag tag-yellow">{lang === 'ar' ? 'تاريخ سابق' : 'Past date'}</span>
+            )}
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 90px', gap: 8, padding: '4px 0 8px', borderBottom: '0.5px solid #d4d4d4', fontSize: 11, color: '#888', fontWeight: 500 }}>
             <span>{lang === 'ar' ? 'المنتج' : 'Product'}</span>
             <span>{lang === 'ar' ? 'الوحدة' : 'Unit'}</span>
