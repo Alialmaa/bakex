@@ -70,8 +70,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         items,
         subtotal: subtotal_excl_vat || total,
         subtotal_excl_vat: subtotal_excl_vat || total,
-        vat_rate: vat_rate || 15,
-        vat_amount: vat_amount || 0,
+        vat_rate: vat_rate ?? 0,
+        vat_amount: vat_amount ?? 0,
         total,
         payment_method: payment_method || 'cash',
       })

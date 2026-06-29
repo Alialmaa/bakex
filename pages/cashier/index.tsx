@@ -2,7 +2,6 @@ import { useState, useRef } from 'react'
 import type { GetServerSideProps } from 'next'
 import { getUser } from '../../lib/auth'
 import { supabaseAdmin } from '../../lib/supabase'
-import { generateZATCAQR } from '../../lib/zatca'
 
 interface CartItem { id: string; name: string; price: number; qty: number }
 interface Invoice {
@@ -48,10 +47,8 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
     else setCart(prev => prev.map(i => i.id === id ? { ...i, qty } : i))
   }
 
-  const VAT_RATE = 15
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0)
-  const vatAmount = parseFloat((subtotal * VAT_RATE / 100).toFixed(2))
-  const total = parseFloat((subtotal + vatAmount).toFixed(2))
+  const total = parseFloat(subtotal.toFixed(2))
   const itemCount = cart.reduce((s, i) => s + i.qty, 0)
   const change = payMethod === 'cash' ? (parseFloat(cashGiven) || 0) - total : 0
 
@@ -62,7 +59,7 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
       const res = await fetch('/api/cashier/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_name: customerName, items: cart, subtotal_excl_vat: subtotal, vat_amount: vatAmount, vat_rate: VAT_RATE, total, payment_method: payMethod }),
+        body: JSON.stringify({ customer_name: customerName, items: cart, subtotal_excl_vat: subtotal, vat_amount: 0, vat_rate: 0, total, payment_method: payMethod }),
       })
       if (res.ok) {
         const invoice = await res.json()
@@ -303,21 +300,17 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
                 style={{ marginBottom: 12, fontSize: 13, background: '#f8fafc', border: '1px solid #e2e8f0' }}
               />
 
-              {/* Subtotal + VAT */}
+              {/* Subtotal */}
               <div style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 12px', marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: '#64748b' }}>
-                  <span>{itemCount} منتج — المجموع قبل الضريبة</span>
+                  <span>{itemCount} منتج</span>
                   <span>{subtotal.toFixed(2)} ر.س</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: '#64748b' }}>
-                  <span>ضريبة القيمة المضافة ١٥٪</span>
-                  <span>{vatAmount.toFixed(2)} ر.س</span>
                 </div>
               </div>
 
               {/* Total */}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 14, padding: '10px 0', borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9' }}>
-                <span>الإجمالي شامل الضريبة</span>
+                <span>الإجمالي</span>
                 <span style={{ color: GREEN }}>{total.toFixed(2)} <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>ر.س</span></span>
               </div>
 
@@ -530,41 +523,16 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
 
               {/* Totals */}
               <div style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', marginBottom: 5 }}>
-                  <span>المجموع قبل الضريبة</span>
-                  <span>{(selectedInvoice.subtotal_excl_vat ?? Number(selectedInvoice.total) / 1.15).toFixed(2)} ر.س</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-                  <span>ضريبة القيمة المضافة ({selectedInvoice.vat_rate ?? 15}٪)</span>
-                  <span>{(selectedInvoice.vat_amount ?? Number(selectedInvoice.total) - Number(selectedInvoice.total) / 1.15).toFixed(2)} ر.س</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 900, color: '#1e293b', paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
-                  <span>الإجمالي شامل الضريبة</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 900, color: '#1e293b' }}>
+                  <span>الإجمالي</span>
                   <span style={{ color: GREEN }}>{Number(selectedInvoice.total).toFixed(2)} ر.س</span>
                 </div>
               </div>
 
-              {/* Payment + QR */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                <div>
-                  <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>طريقة الدفع</div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{selectedInvoice.payment_method === 'cash' ? 'كاش' : 'شبكة / بطاقة'}</div>
-                </div>
-                {bakerySettings?.vat_number && (() => {
-                  const qr = generateZATCAQR({
-                    sellerName: bakerySettings.name || bakeryName || 'Bakex',
-                    vatNumber: bakerySettings.vat_number,
-                    timestamp: selectedInvoice.created_at,
-                    totalWithVat: Number(selectedInvoice.total).toFixed(2),
-                    vatAmount: (selectedInvoice.vat_amount ?? Number(selectedInvoice.total) - Number(selectedInvoice.total) / 1.15).toFixed(2),
-                  })
-                  return (
-                    <div style={{ textAlign: 'center' }}>
-                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(qr)}`} alt="ZATCA QR" width={90} height={90} style={{ borderRadius: 6 }} />
-                      <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 3 }}>ZATCA QR</div>
-                    </div>
-                  )
-                })()}
+              {/* Payment */}
+              <div>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>طريقة الدفع</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{selectedInvoice.payment_method === 'cash' ? 'كاش' : 'شبكة / بطاقة'}</div>
               </div>
 
               <div style={{ textAlign: 'center', marginTop: 14, fontSize: 11, color: '#94a3b8', paddingTop: 10, borderTop: '1px dashed #e2e8f0' }}>
