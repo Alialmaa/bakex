@@ -171,11 +171,12 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   if (!user.perms?.reports) return { redirect: { destination: '/', permanent: false } }
 
   const monthStart = new Date().toISOString().slice(0, 7) + '-01'
+  const bid = user.bakery_id
   const [{ data: sales }, { data: recipes }, { data: stock }, { data: prodLog }] = await Promise.all([
-    supabaseAdmin.from('sales').select('*').gte('created_at', monthStart),
-    supabaseAdmin.from('recipes').select('*'),
-    supabaseAdmin.from('stock').select('*'),
-    supabaseAdmin.from('production_log').select('*').gte('created_at', monthStart),
+    bid ? supabaseAdmin.from('sales').select('*').eq('bakery_id', bid).gte('created_at', monthStart) : supabaseAdmin.from('sales').select('*').gte('created_at', monthStart),
+    bid ? supabaseAdmin.from('recipes').select('*').eq('bakery_id', bid) : supabaseAdmin.from('recipes').select('*'),
+    bid ? supabaseAdmin.from('stock').select('*').eq('bakery_id', bid) : supabaseAdmin.from('stock').select('*'),
+    bid ? supabaseAdmin.from('production_log').select('*').eq('bakery_id', bid).gte('created_at', monthStart) : supabaseAdmin.from('production_log').select('*').gte('created_at', monthStart),
   ])
 
   const getStk = (name: string) => (stock || []).find((s: any) => s.name === name)

@@ -167,9 +167,10 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
   if (!user) return { redirect: { destination: '/login', permanent: false } }
   if (!user.perms?.cost) return { redirect: { destination: '/', permanent: false } }
+  const bid = user.bakery_id
   const [{ data: recipes }, { data: stock }] = await Promise.all([
-    supabaseAdmin.from('recipes').select('*').order('name'),
-    supabaseAdmin.from('stock').select('*'),
+    bid ? supabaseAdmin.from('recipes').select('*').eq('bakery_id', bid).order('name') : supabaseAdmin.from('recipes').select('*').order('name'),
+    bid ? supabaseAdmin.from('stock').select('*').eq('bakery_id', bid) : supabaseAdmin.from('stock').select('*'),
   ])
   return { props: { user, initialRecipes: recipes || [], initialStock: stock || [] } }
 }

@@ -3,23 +3,29 @@ import bcrypt from 'bcryptjs'
 import { parse, serialize } from 'cookie'
 import type { NextApiRequest, NextApiResponse } from 'next'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'bakex_secret'
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is not set. Refusing to start with an insecure default.')
+}
+const SECRET = process.env.JWT_SECRET
 
 export const hashPassword = (password: string) => bcrypt.hashSync(password, 10)
 export const comparePassword = (password: string, hash: string) => bcrypt.compareSync(password, hash)
 
 export const signToken = (payload: object) =>
-  jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
+  jwt.sign(payload, SECRET, { expiresIn: '7d' })
 
 export const verifyToken = (token: string) => {
-  try { return jwt.verify(token, JWT_SECRET) as any }
+  try { return jwt.verify(token, SECRET) as any }
   catch { return null }
 }
 
 export const setAuthCookie = (res: NextApiResponse, token: string) => {
   res.setHeader('Set-Cookie', serialize('bakex_token', token, {
-    httpOnly: true, secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax', maxAge: 60 * 60 * 24 * 7, path: '/'
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7,
+    path: '/'
   }))
 }
 
@@ -46,3 +52,5 @@ export const requirePerm = (req: NextApiRequest, res: NextApiResponse, perm: str
   if (!user.perms?.[perm]) { res.status(403).json({ error: 'Forbidden' }); return null }
   return user
 }
+
+export const isSuperAdmin = (user: any) => user?.role === 'super_admin'

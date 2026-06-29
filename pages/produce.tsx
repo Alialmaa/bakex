@@ -356,11 +356,12 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const today = new Date().toISOString().split('T')[0]
   const monthStart = new Date().toISOString().slice(0, 7) + '-01'
 
+  const bid = user.bakery_id
   const [{ data: recipes }, { data: stock }, { data: todayLog }, { data: monthDates }] = await Promise.all([
-    supabaseAdmin.from('recipes').select('*').order('name'),
-    supabaseAdmin.from('stock').select('*'),
-    supabaseAdmin.from('production_log').select('*').gte('created_at', today + 'T00:00:00').order('created_at', { ascending: false }),
-    supabaseAdmin.from('production_log').select('created_at').gte('created_at', monthStart),
+    bid ? supabaseAdmin.from('recipes').select('*').eq('bakery_id', bid).order('name') : supabaseAdmin.from('recipes').select('*').order('name'),
+    bid ? supabaseAdmin.from('stock').select('*').eq('bakery_id', bid) : supabaseAdmin.from('stock').select('*'),
+    bid ? supabaseAdmin.from('production_log').select('*').eq('bakery_id', bid).gte('created_at', today + 'T00:00:00').order('created_at', { ascending: false }) : supabaseAdmin.from('production_log').select('*').gte('created_at', today + 'T00:00:00').order('created_at', { ascending: false }),
+    bid ? supabaseAdmin.from('production_log').select('created_at').eq('bakery_id', bid).gte('created_at', monthStart) : supabaseAdmin.from('production_log').select('created_at').gte('created_at', monthStart),
   ])
 
   return { props: { user, initialRecipes: recipes || [], initialStock: stock || [], initialLog: todayLog || [], initialMonthDates: monthDates || [] } }

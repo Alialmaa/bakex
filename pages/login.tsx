@@ -24,7 +24,7 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password })
       })
       const data = await res.json()
-      if (res.ok) router.push('/')
+      if (res.ok) { window.location.href = '/dashboard' }
       else setError(data.error || (isAR ? 'بيانات غير صحيحة' : 'Invalid credentials'))
     } finally { setLoading(false) }
   }
@@ -66,13 +66,6 @@ export default function LoginPage() {
           <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '11px 0' }} onClick={handleLogin} disabled={loading}>
             {loading ? '...' : (isAR ? 'دخول' : 'Login')}
           </button>
-
-          <div style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: '#888' }}>
-            {isAR ? 'ما عندك حساب؟ ' : "Don't have an account? "}
-            <span style={{ color: '#1D9E75', cursor: 'pointer', fontWeight: 500 }} onClick={() => router.push('/register')}>
-              {isAR ? 'طلب إنشاء حساب' : 'Request Account'}
-            </span>
-          </div>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 12, display: 'flex', justifyContent: 'center', gap: 6 }}>
@@ -89,6 +82,6 @@ export default function LoginPage() {
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
-  if (user) return { redirect: { destination: '/', permanent: false } }
+  if (user) return { redirect: { destination: '/dashboard', permanent: false } }
   return { props: {} }
 }
