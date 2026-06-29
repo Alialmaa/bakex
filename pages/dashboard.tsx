@@ -189,7 +189,7 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
   if (!user) return { redirect: { destination: '/login', permanent: false } }
   if (user.role === 'super_admin') return { redirect: { destination: '/bakeries', permanent: false } }
-  if (!user.perms?.dashboard) return { redirect: { destination: '/login', permanent: false } }
+  if (!user.perms?.dashboard) return { redirect: { destination: '/cashier', permanent: false } }
 
   const bakery_id = user.bakery_id
   const today = new Date().toISOString().split('T')[0]

@@ -7,6 +7,7 @@ import { useLang } from '../lib/useLang'
 export default function LoginPage() {
   const router = useRouter()
   const { lang, setLang } = useLang()
+  const [mode, setMode] = useState<'system' | 'cashier'>('system')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -24,7 +25,9 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password })
       })
       const data = await res.json()
-      if (res.ok) { window.location.href = '/dashboard' }
+      // The destination page itself re-checks permissions and redirects to the
+      // right place if this choice doesn't match the account's actual access.
+      if (res.ok) { window.location.href = mode === 'cashier' ? '/cashier' : '/dashboard' }
       else setError(data.error || (isAR ? 'بيانات غير صحيحة' : 'Invalid credentials'))
     } finally { setLoading(false) }
   }
@@ -42,8 +45,37 @@ export default function LoginPage() {
           <div style={{ fontSize: 16, fontWeight: 500, textAlign: 'center', marginBottom: 4 }}>
             {isAR ? 'تسجيل الدخول' : 'Login'}
           </div>
-          <div style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 20 }}>
-            {isAR ? 'أدخل بياناتك للوصول إلى النظام' : 'Enter your credentials to access the system'}
+          <div style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 16 }}>
+            {isAR ? 'اختر نوع الدخول' : 'Choose how you want to sign in'}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+            <button
+              onClick={() => setMode('system')}
+              style={{
+                padding: '12px 8px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                border: `2px solid ${mode === 'system' ? '#1D9E75' : '#e2e8f0'}`,
+                background: mode === 'system' ? '#ecfdf5' : '#fff',
+                color: mode === 'system' ? '#0d7a5a' : '#64748b',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                fontWeight: mode === 'system' ? 700 : 500,
+              }}>
+              <span style={{ fontSize: 20 }}>🏢</span>
+              <span style={{ fontSize: 12.5 }}>{isAR ? 'نظام الإدارة' : 'Management'}</span>
+            </button>
+            <button
+              onClick={() => setMode('cashier')}
+              style={{
+                padding: '12px 8px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                border: `2px solid ${mode === 'cashier' ? '#6366f1' : '#e2e8f0'}`,
+                background: mode === 'cashier' ? '#eef2ff' : '#fff',
+                color: mode === 'cashier' ? '#4338ca' : '#64748b',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                fontWeight: mode === 'cashier' ? 700 : 500,
+              }}>
+              <span style={{ fontSize: 20 }}>🧾</span>
+              <span style={{ fontSize: 12.5 }}>{isAR ? 'الكاشير' : 'Cashier'}</span>
+            </button>
           </div>
 
           {error && <div className="alert alert-error">⚠ {error}</div>}
