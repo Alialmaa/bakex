@@ -14,6 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(await listPurchases(bakery_id))
     }
     if (req.method === 'POST') {
+      if (!user.perms?.stock && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
       const { material_name, qty, unit, pack_weight, pack_price, price_per_unit, notes } = req.body
       const err = requireString(material_name, 'material_name')
         || requirePositiveNumber(qty, 'qty')
@@ -24,6 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       )
     }
     if (req.method === 'DELETE') {
+      if (!user.perms?.stock && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
       await deletePurchase(req.body.id, bakery_id)
       return res.status(200).json({ success: true })
     }

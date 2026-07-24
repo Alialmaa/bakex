@@ -12,7 +12,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { bakery_name, name, username, password } = req.body
   if (!bakery_name || !name || !username || !password)
     return res.redirect(302, '/?error=missing')
-
+  if (typeof bakery_name !== 'string' || bakery_name.length > 100)
+    return res.redirect(302, '/?error=invalid_input')
+  if (typeof name !== 'string' || name.length > 100)
+    return res.redirect(302, '/?error=invalid_input')
+  if (typeof username !== 'string' || username.length > 50)
+    return res.redirect(302, '/?error=invalid_input')
   if (password.length < 6)
     return res.redirect(302, '/?error=short_password')
 

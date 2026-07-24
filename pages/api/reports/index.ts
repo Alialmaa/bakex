@@ -12,6 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!user) return
   const bakery_id = user.bakery_id
   if (!bakery_id && !isSuperAdmin(user)) return res.status(403).json({ error: 'No bakery assigned' })
+  if (!user.perms?.reports && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
 
   try {
     const today = new Date().toISOString().split('T')[0]

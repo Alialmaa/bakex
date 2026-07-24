@@ -29,6 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'POST') {
+    if (!user.perms?.sales && !user.perms?.cashier) return res.status(403).json({ error: 'Forbidden' })
     const { customer_name, items, total, subtotal_excl_vat, vat_amount, vat_rate, payment_method } = req.body
 
     if (!Array.isArray(items) || items.length === 0) {

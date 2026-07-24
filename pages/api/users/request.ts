@@ -11,7 +11,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!name || !username || !password)
     return res.status(400).json({ error: 'Missing fields' })
-
+  if (typeof name !== 'string' || name.length > 100)
+    return res.status(400).json({ error: 'name must be at most 100 characters' })
+  if (typeof username !== 'string' || username.length > 50)
+    return res.status(400).json({ error: 'username must be at most 50 characters' })
   if (typeof password !== 'string' || password.length < 6)
     return res.status(400).json({ error: 'Password must be at least 6 characters' })
 

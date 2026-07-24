@@ -11,14 +11,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { name, username, password, role, perms } = req.body
   if (!name || !username || !password)
     return res.status(400).json({ error: 'Missing fields' })
+  if (typeof name !== 'string' || name.length > 100)
+    return res.status(400).json({ error: 'name must be at most 100 characters' })
+  if (typeof username !== 'string' || username.length > 50)
+    return res.status(400).json({ error: 'username must be at most 50 characters' })
   if (typeof password !== 'string' || password.length < 6)
     return res.status(400).json({ error: 'Password must be at least 6 characters' })
+
+  const ALLOWED_ROLES = ['staff', 'manager', 'readonly']
+  const safeRole = ALLOWED_ROLES.includes(role) ? role : 'staff'
+
+  const ALLOWED_PERMS = ['dashboard', 'stock', 'produce', 'sales', 'cost', 'reports', 'users']
+  const safePerms: Record<string, boolean> = {}
+  if (perms && typeof perms === 'object') {
+    for (const key of ALLOWED_PERMS) {
+      if (key in perms) safePerms[key] = Boolean(perms[key])
+    }
+  }
 
   try {
     const data = await createUser({
       name, username, password,
-      role: role || 'staff',
-      perms: perms || {},
+      role: safeRole,
+      perms: safePerms,
       bakery_id: user.bakery_id,
       status: 'active',
     })

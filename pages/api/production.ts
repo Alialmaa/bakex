@@ -13,6 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(await listProduction(bakery_id, req.query.date as string))
     }
     if (req.method === 'PUT') {
+      if (!user.perms?.produce && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
       const { id, output_qty } = req.body
       if (typeof id !== 'string' || !id) return res.status(400).json({ error: 'id is required' })
       if (typeof output_qty !== 'number' || output_qty <= 0 || !Number.isFinite(output_qty))
@@ -21,6 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true })
     }
     if (req.method === 'DELETE') {
+      if (!user.perms?.produce && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
       await deleteProductionEntry(req.body.id, bakery_id)
       return res.status(200).json({ success: true })
     }
