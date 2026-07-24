@@ -14,6 +14,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (req.method === 'PUT') {
       const { id, output_qty } = req.body
+      if (typeof id !== 'string' || !id) return res.status(400).json({ error: 'id is required' })
+      if (typeof output_qty !== 'number' || output_qty <= 0 || !Number.isFinite(output_qty))
+        return res.status(400).json({ error: 'output_qty must be a positive number' })
       await updateProductionEntry(id, bakery_id, output_qty)
       return res.status(200).json({ success: true })
     }

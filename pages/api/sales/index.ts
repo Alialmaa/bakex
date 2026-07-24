@@ -15,6 +15,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (req.method === 'POST') {
       const { entries, date } = req.body
+      if (!Array.isArray(entries) || entries.length === 0)
+        return res.status(400).json({ error: 'entries must be a non-empty array' })
+      for (const e of entries) {
+        if (!e || typeof e.recipe_id !== 'string' || !e.recipe_id)
+          return res.status(400).json({ error: 'Each entry must have a valid recipe_id' })
+        if (typeof e.qty !== 'number' || e.qty <= 0 || !Number.isFinite(e.qty))
+          return res.status(400).json({ error: 'Each entry must have a positive qty' })
+        if (typeof e.price !== 'number' || e.price < 0 || !Number.isFinite(e.price))
+          return res.status(400).json({ error: 'Each entry must have a non-negative price' })
+      }
       return res.status(200).json(await createSales(bakery_id, entries, user.id, date))
     }
     if (req.method === 'DELETE') {
