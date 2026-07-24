@@ -8,7 +8,7 @@ import { getPurchaseCostInRange } from '../../../lib/db/purchases'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).end()
-  const user = requireAuth(req, res)
+  const user = await requireAuth(req, res)
   if (!user) return
   const bakery_id = user.bakery_id
   if (!bakery_id && !isSuperAdmin(user)) return res.status(403).json({ error: 'No bakery assigned' })

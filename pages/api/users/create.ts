@@ -4,7 +4,7 @@ import { createUser } from '../../../lib/db/users'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
-  const user = requirePerm(req, res, 'users')
+  const user = await requirePerm(req, res, 'users')
   if (!user) return
   if (!user.bakery_id) return res.status(403).json({ error: 'No bakery assigned' })
 

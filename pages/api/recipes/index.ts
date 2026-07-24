@@ -4,7 +4,7 @@ import { listRecipes, createRecipe, updateRecipe, deleteRecipe } from '../../../
 import { requireString, requireNonNegativeNumber } from '../../../lib/validate'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const user = requireAuth(req, res)
+  const user = await requireAuth(req, res)
   if (!user) return
   const bakery_id = user.bakery_id
   if (!bakery_id && !isSuperAdmin(user)) return res.status(403).json({ error: 'No bakery assigned' })

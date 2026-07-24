@@ -4,7 +4,7 @@ import { requireAuth } from '../../../lib/auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
-  const user = requireAuth(req, res)
+  const user = await requireAuth(req, res)
   if (!user) return
 
   const bakery_id = user.bakery_id

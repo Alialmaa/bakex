@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
-  const limit = checkRateLimit(`login:${ip}:${username.toLowerCase()}`)
+  const limit = await checkRateLimit(`login:${ip}:${username.toLowerCase()}`)
   if (!limit.allowed) {
     return res.status(429).json({ error: `Too many attempts. Try again in ${limit.retryAfterSec}s.` })
   }
@@ -58,6 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     perms: user.perms,
     bakery_id: user.bakery_id ?? null,
     bakery_name,
+    tv: user.token_version ?? 0,
   })
 
   setAuthCookie(res, token)

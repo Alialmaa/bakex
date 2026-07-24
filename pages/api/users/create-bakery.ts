@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.redirect(302, '/?error=short_password')
 
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
-  const limit = checkRateLimit(`register:${ip}`)
+  const limit = await checkRateLimit(`register:${ip}`)
   if (!limit.allowed) return res.redirect(302, '/?error=rate_limited')
 
   try {
@@ -46,6 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       perms: newUser.perms,
       bakery_id: bakery.id,
       bakery_name: bakery.name,
+      tv: newUser.token_version ?? 0,
     })
 
     setAuthCookie(res, token)

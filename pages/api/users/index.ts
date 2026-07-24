@@ -4,7 +4,7 @@ import { listUsers, updateUser, deleteUser } from '../../../lib/db/users'
 import { logAudit } from '../../../lib/audit'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const user = requirePerm(req, res, 'users')
+  const user = await requirePerm(req, res, 'users')
   if (!user) return
   const bakery_id = user.bakery_id
   if (!bakery_id) return res.status(403).json({ error: 'No bakery assigned' })

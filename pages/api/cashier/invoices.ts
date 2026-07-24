@@ -5,7 +5,7 @@ import { createSales } from '../../../lib/db/sales'
 import { requirePositiveNumber } from '../../../lib/validate'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const user = requireAuth(req, res)
+  const user = await requireAuth(req, res)
   if (!user) return
 
   const bakery_id = user.bakery_id
