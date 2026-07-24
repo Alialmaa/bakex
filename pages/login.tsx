@@ -111,9 +111,9 @@ export default function LoginPage() {
             <div style={{ marginTop: 12, background: '#f0fdf4', border: '1px solid rgba(22,166,121,0.25)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#166534', textAlign: 'center', lineHeight: 1.7 }}>
               {isAR
                 ? <>تواصل مع مدير النظام عبر واتساب لإعادة تعيين كلمة المرور:<br/>
-                    <a href="https://wa.me/966XXXXXXXXX" target="_blank" rel="noopener noreferrer"
+                    <a href="https://wa.me/966559219189" target="_blank" rel="noopener noreferrer"
                       style={{ color: '#16a679', fontWeight: 700, direction: 'ltr', display: 'inline-block', marginTop: 4 }}>
-                      966XXXXXXXXX+
+                      966559219189+
                     </a>
                   </>
                 : <>Contact your system admin on WhatsApp to reset your password.</>
