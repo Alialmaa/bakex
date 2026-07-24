@@ -351,7 +351,7 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
   if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.produce) return { redirect: { destination: '/', permanent: false } }
+  if (!user.perms?.produce) return { redirect: { destination: '/403', permanent: false } }
 
   const today = new Date().toISOString().split('T')[0]
   const monthStart = new Date().toISOString().slice(0, 7) + '-01'

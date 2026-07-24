@@ -21,9 +21,10 @@ export async function getBakeryByCode(code: string) {
 
 export async function createBakery(name: string) {
   const code = generateCode()
+  const trial_ends_at = new Date(Date.now() + 30 * 86_400_000).toISOString()
   const { data, error } = await supabaseAdmin
     .from('bakeries')
-    .insert({ name, code })
+    .insert({ name, code, trial_ends_at, subscription_status: 'trial' })
     .select()
     .single()
   if (error) throw error

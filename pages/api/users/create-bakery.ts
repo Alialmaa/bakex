@@ -12,12 +12,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { bakery_name, name, username, password } = req.body
   if (!bakery_name || !name || !username || !password)
     return res.redirect(302, '/?error=missing')
-
+  if (typeof bakery_name !== 'string' || bakery_name.length > 100)
+    return res.redirect(302, '/?error=invalid_input')
+  if (typeof name !== 'string' || name.length > 100)
+    return res.redirect(302, '/?error=invalid_input')
+  if (typeof username !== 'string' || username.length > 50)
+    return res.redirect(302, '/?error=invalid_input')
   if (password.length < 6)
     return res.redirect(302, '/?error=short_password')
 
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
-  const limit = checkRateLimit(`register:${ip}`)
+  const limit = await checkRateLimit(`register:${ip}`)
   if (!limit.allowed) return res.redirect(302, '/?error=rate_limited')
 
   try {
@@ -46,12 +51,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       perms: newUser.perms,
       bakery_id: bakery.id,
       bakery_name: bakery.name,
+      tv: newUser.token_version ?? 0,
     })
 
     setAuthCookie(res, token)
     // Server-side redirect — cookie is guaranteed to be set before browser loads /dashboard
     return res.redirect(302, `/dashboard?new=1&bakery=${encodeURIComponent(bakery.code)}`)
   } catch (e: any) {
-    return res.redirect(302, `/?error=${encodeURIComponent(e.message || 'error')}`)
+    return res.redirect(302, '/?error=create_failed')
   }
 }

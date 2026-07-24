@@ -11,12 +11,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!name || !username || !password)
     return res.status(400).json({ error: 'Missing fields' })
-
+  if (typeof name !== 'string' || name.length > 100)
+    return res.status(400).json({ error: 'name must be at most 100 characters' })
+  if (typeof username !== 'string' || username.length > 50)
+    return res.status(400).json({ error: 'username must be at most 50 characters' })
   if (typeof password !== 'string' || password.length < 6)
     return res.status(400).json({ error: 'Password must be at least 6 characters' })
 
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
-  const limit = checkRateLimit(`register:${ip}`)
+  const limit = await checkRateLimit(`register:${ip}`)
   if (!limit.allowed) return res.status(429).json({ error: `Too many attempts. Try again in ${limit.retryAfterSec}s.` })
 
   try {
@@ -48,6 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         perms: newUser.perms,
         bakery_id: bakery.id,
         bakery_name: bakery.name,
+        tv: newUser.token_version ?? 0,
       })
       setAuthCookie(res, token)
 

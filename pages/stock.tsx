@@ -329,7 +329,7 @@ export default function StockPage({ user, initialStock }: any) {
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
   if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.stock) return { redirect: { destination: '/', permanent: false } }
+  if (!user.perms?.stock) return { redirect: { destination: '/403', permanent: false } }
   const bid = user.bakery_id
   const { data } = bid
     ? await supabaseAdmin.from('stock').select('*').eq('bakery_id', bid).order('name')

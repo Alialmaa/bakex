@@ -41,9 +41,18 @@ export async function countPendingUsers(bakery_id: string | null) {
 export async function updateUser(id: string, bakery_id: string, update: {
   role?: string; perms?: object; status?: string
 }) {
+  // Fetch current token_version so we can invalidate the user's active sessions
+  const { data: cur } = await supabaseAdmin
+    .from('users').select('token_version').eq('id', id).eq('bakery_id', bakery_id).single()
+
+  const payload: any = { ...update }
+  if (cur?.token_version !== undefined) {
+    payload.token_version = cur.token_version + 1
+  }
+
   const { data, error } = await supabaseAdmin
     .from('users')
-    .update(update)
+    .update(payload)
     .eq('id', id)
     .eq('bakery_id', bakery_id)
     .select()

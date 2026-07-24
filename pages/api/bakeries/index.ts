@@ -3,7 +3,7 @@ import { requireAuth, isSuperAdmin } from '../../../lib/auth'
 import { listBakeries, createBakery, getBakeryUserCount } from '../../../lib/db/bakeries'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const user = requireAuth(req, res)
+  const user = await requireAuth(req, res)
   if (!user) return
   if (!isSuperAdmin(user)) return res.status(403).json({ error: 'Super admin only' })
 

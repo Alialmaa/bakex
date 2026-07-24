@@ -4,7 +4,7 @@ import { listUsers, updateUser, deleteUser } from '../../../lib/db/users'
 import { logAudit } from '../../../lib/audit'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const user = requirePerm(req, res, 'users')
+  const user = await requirePerm(req, res, 'users')
   if (!user) return
   const bakery_id = user.bakery_id
   if (!bakery_id) return res.status(403).json({ error: 'No bakery assigned' })
@@ -17,7 +17,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { id, role, perms, status } = req.body
       if (typeof id !== 'string' || !id) return res.status(400).json({ error: 'id is required' })
 
-      await updateUser(id, bakery_id, { role, perms, status })
+      const ALLOWED_ROLES = ['staff', 'manager', 'readonly']
+      const ALLOWED_STATUSES = ['active', 'rejected']
+      const ALLOWED_PERMS = ['dashboard', 'stock', 'produce', 'sales', 'cost', 'reports', 'users']
+
+      const safeRole = role !== undefined
+        ? (ALLOWED_ROLES.includes(role) ? role : undefined)
+        : undefined
+
+      const safeStatus = status !== undefined
+        ? (ALLOWED_STATUSES.includes(status) ? status : undefined)
+        : undefined
+
+      const safePerms: Record<string, boolean> | undefined = perms && typeof perms === 'object'
+        ? Object.fromEntries(ALLOWED_PERMS.filter(k => k in perms).map(k => [k, Boolean(perms[k])]))
+        : undefined
+
+      await updateUser(id, bakery_id, { role: safeRole, perms: safePerms, status: safeStatus })
 
       await logAudit({
         bakery_id, actor_id: user.id, actor_name: user.name,

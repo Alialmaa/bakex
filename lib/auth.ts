@@ -2,6 +2,8 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { parse, serialize } from 'cookie'
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { supabaseAdmin } from './supabase'
+import { checkBakeryAccess } from './subscription'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set. Refusing to start with an insecure default.')
@@ -12,7 +14,7 @@ export const hashPassword = (password: string) => bcrypt.hashSync(password, 10)
 export const comparePassword = (password: string, hash: string) => bcrypt.compareSync(password, hash)
 
 export const signToken = (payload: object) =>
-  jwt.sign(payload, SECRET, { expiresIn: '7d' })
+  jwt.sign(payload, SECRET, { expiresIn: '8h' })
 
 export const verifyToken = (token: string) => {
   try { return jwt.verify(token, SECRET) as any }
@@ -24,7 +26,7 @@ export const setAuthCookie = (res: NextApiResponse, token: string) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: 60 * 60 * 8,
     path: '/'
   }))
 }
@@ -40,17 +42,75 @@ export const getUser = (req: NextApiRequest) => {
   return verifyToken(token)
 }
 
-export const requireAuth = (req: NextApiRequest, res: NextApiResponse) => {
+// Per-user cache to avoid a DB roundtrip on every single request.
+const _vc = new Map<string, { v: number; s: string; t: number }>()
+const VC_TTL = 30_000
+
+async function isSessionValid(userId: string, tokenVersion: number): Promise<boolean> {
+  const now = Date.now()
+  const hit = _vc.get(userId)
+  if (hit && now - hit.t < VC_TTL) {
+    return hit.v === tokenVersion && hit.s === 'active'
+  }
+  try {
+    const { data } = await supabaseAdmin
+      .from('users')
+      .select('token_version, status')
+      .eq('id', userId)
+      .single()
+    if (!data) return false
+    _vc.set(userId, { v: data.token_version ?? 0, s: data.status ?? 'active', t: now })
+    return (data.token_version ?? 0) === tokenVersion && data.status === 'active'
+  } catch {
+    return true
+  }
+}
+
+export interface AuthOptions {
+  skipSubscription?: boolean
+}
+
+export const isSuperAdmin = (user: any) => user?.role === 'super_admin'
+
+export const requireAuth = async (
+  req: NextApiRequest,
+  res: NextApiResponse,
+  opts?: AuthOptions
+) => {
   const user = getUser(req)
   if (!user) { res.status(401).json({ error: 'Unauthorized' }); return null }
+
+  if (user.tv !== undefined) {
+    const valid = await isSessionValid(user.id, user.tv)
+    if (!valid) {
+      res.status(401).json({ error: 'Session expired. Please log in again.' })
+      return null
+    }
+  }
+
+  if (user.bakery_id && !isSuperAdmin(user) && !opts?.skipSubscription) {
+    const access = await checkBakeryAccess(user.bakery_id)
+    if (!access.allowed) {
+      res.status(402).json({
+        error: 'subscription_expired',
+        status: access.status,
+        daysLeft: 0,
+      })
+      return null
+    }
+  }
+
   return user
 }
 
-export const requirePerm = (req: NextApiRequest, res: NextApiResponse, perm: string) => {
-  const user = requireAuth(req, res)
+export const requirePerm = async (
+  req: NextApiRequest,
+  res: NextApiResponse,
+  perm: string,
+  opts?: AuthOptions
+) => {
+  const user = await requireAuth(req, res, opts)
   if (!user) return null
   if (!user.perms?.[perm]) { res.status(403).json({ error: 'Forbidden' }); return null }
   return user
 }
-
-export const isSuperAdmin = (user: any) => user?.role === 'super_admin'

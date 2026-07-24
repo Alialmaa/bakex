@@ -29,7 +29,8 @@ export default function CostPage({ user, initialRecipes, initialStock }: any) {
       const m = getStk(ing.material)
       return s + (m ? m.price_per_unit * ing.amount : 0)
     }, 0)
-    return recipe.output_qty > 0 ? total / recipe.output_qty : 0
+    const units = recipe.units_per_batch || recipe.output_qty
+    return units > 0 ? total / units : 0
   }
 
   if (recipes.length === 0) {
@@ -45,7 +46,7 @@ export default function CostPage({ user, initialRecipes, initialStock }: any) {
   }
 
   const unitCost = calcUnitCost(selected)
-  const batchCost = unitCost * (selected?.output_qty || 1)
+  const batchCost = unitCost * (selected?.units_per_batch || selected?.output_qty || 1)
   const profit = sellPrice - unitCost
   const margin = sellPrice > 0 ? (profit / sellPrice) * 100 : null
   const suggested = unitCost > 0 ? (unitCost / 0.7).toFixed(2) : null
@@ -116,7 +117,7 @@ export default function CostPage({ user, initialRecipes, initialStock }: any) {
                     )
                   })}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #e5e5e5', fontSize: 13 }}>
-                    <span style={{ color: '#888' }}>{selected.output_qty} {selected.output_unit}</span>
+                    <span style={{ color: '#888' }}>{selected.units_per_batch || selected.output_qty} {selected.output_unit}</span>
                     <span><strong>{batchCost.toFixed(2)} {t.currency}</strong></span>
                   </div>
                 </>
@@ -166,7 +167,7 @@ export default function CostPage({ user, initialRecipes, initialStock }: any) {
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
   if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.cost) return { redirect: { destination: '/', permanent: false } }
+  if (!user.perms?.cost) return { redirect: { destination: '/403', permanent: false } }
   const bid = user.bakery_id
   const [{ data: recipes }, { data: stock }] = await Promise.all([
     bid ? supabaseAdmin.from('recipes').select('*').eq('bakery_id', bid).order('name') : supabaseAdmin.from('recipes').select('*').order('name'),

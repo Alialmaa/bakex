@@ -200,7 +200,7 @@ export default function PurchasesPage({ user, initialPurchases, initialStock }: 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
   if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.stock) return { redirect: { destination: '/', permanent: false } }
+  if (!user.perms?.stock) return { redirect: { destination: '/403', permanent: false } }
 
   const bid = user.bakery_id
   const [{ data: purchases }, { data: stock }] = await Promise.all([

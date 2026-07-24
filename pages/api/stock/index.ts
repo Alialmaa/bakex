@@ -4,7 +4,7 @@ import { listStock, addStockItem, updateStockItem, deleteStockItem } from '../..
 import { requireString, requireNonNegativeNumber } from '../../../lib/validate'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const user = requireAuth(req, res)
+  const user = await requireAuth(req, res)
   if (!user) return
   const bakery_id = user.bakery_id
   if (!bakery_id && !isSuperAdmin(user)) return res.status(403).json({ error: 'No bakery assigned' })
@@ -14,6 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(await listStock(bakery_id))
     }
     if (req.method === 'POST') {
+      if (!user.perms?.stock && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
       const { name, qty, unit, min_qty, price_per_unit } = req.body
       const err = requireString(name, 'name')
         || requireNonNegativeNumber(qty, 'qty')
@@ -23,6 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(await addStockItem(bakery_id, { name, qty, unit, min_qty, price_per_unit }))
     }
     if (req.method === 'PUT') {
+      if (!user.perms?.stock && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
       const { id, qty, min_qty, price_per_unit } = req.body
       const err = requireString(id, 'id')
         || requireNonNegativeNumber(qty, 'qty')
@@ -32,6 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(await updateStockItem(id, bakery_id, { qty, min_qty, price_per_unit }))
     }
     if (req.method === 'DELETE') {
+      if (!user.perms?.stock && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
       await deleteStockItem(req.body.id, bakery_id)
       return res.status(200).json({ success: true })
     }

@@ -137,7 +137,7 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
   if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.sales) return { redirect: { destination: '/', permanent: false } }
+  if (!user.perms?.sales) return { redirect: { destination: '/403', permanent: false } }
   const bid = user.bakery_id
   const [{ data: recipes }, { data: sales }] = await Promise.all([
     bid ? supabaseAdmin.from('recipes').select('*').eq('bakery_id', bid).order('name') : supabaseAdmin.from('recipes').select('*').order('name'),

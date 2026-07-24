@@ -90,7 +90,7 @@ export default function RegisterPage() {
 
             <div style={{ marginBottom: 24 }}>
               <label style={{ fontSize: 13, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>كلمة المرور</label>
-              <input name="password" type="password" required placeholder="٤ أحرف على الأقل" dir="ltr"
+              <input name="password" type="password" required placeholder="٦ أحرف على الأقل" dir="ltr" minLength={6}
                 style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', background: '#f8fafc', color: '#0f172a', outline: 'none', transition: 'border-color 0.15s' }}
                 onFocus={e => e.target.style.borderColor = GREEN}
                 onBlur={e => e.target.style.borderColor = '#e2e8f0'}

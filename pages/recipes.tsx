@@ -247,7 +247,7 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
   if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.produce) return { redirect: { destination: '/', permanent: false } }
+  if (!user.perms?.produce) return { redirect: { destination: '/403', permanent: false } }
   const bakery_id = user.bakery_id
   const [{ data: recipes }, { data: stock }] = await Promise.all([
     bakery_id

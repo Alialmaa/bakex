@@ -5,19 +5,19 @@ import { createSales } from '../../../lib/db/sales'
 import { requirePositiveNumber } from '../../../lib/validate'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const user = requireAuth(req, res)
+  const user = await requireAuth(req, res)
   if (!user) return
 
   const bakery_id = user.bakery_id
   if (!bakery_id) return res.status(403).json({ error: 'No bakery assigned to this account. Please log out and log in again.' })
 
   if (req.method === 'GET') {
-    const { from, to, limit = 50 } = req.query
+    const { from, to, limit = '50' } = req.query
     let query = supabaseAdmin
       .from('invoices')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(Number(limit))
+      .limit(Math.min(Math.max(1, Number(limit) || 50), 200))
 
     if (bakery_id) query = query.eq('bakery_id', bakery_id)
     if (from) query = query.gte('created_at', from as string)
@@ -29,6 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'POST') {
+    if (!user.perms?.sales && !user.perms?.cashier) return res.status(403).json({ error: 'Forbidden' })
     const { customer_name, items, total, subtotal_excl_vat, vat_amount, vat_rate, payment_method } = req.body
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -103,6 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .from('recipes')
         .select('id, ingredients, units_per_batch, output_qty')
         .in('id', recipeIds)
+        .eq('bakery_id', bakery_id)
 
       if (recipes?.length) {
         for (const item of items) {
@@ -131,6 +133,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 .from('stock')
                 .update({ qty: newQty })
                 .eq('id', stockItems[0].id)
+                .eq('bakery_id', bakery_id)
             }
           }
         }
