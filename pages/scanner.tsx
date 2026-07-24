@@ -35,9 +35,11 @@ export default function ScannerPage({ user, allStock, allRecipes }: any) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>()
+  const manualInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setHasDetector('BarcodeDetector' in window)
+    manualInputRef.current?.focus()
     return () => stopCamera()
   }, [])
 
@@ -230,11 +232,13 @@ export default function ScannerPage({ user, allStock, allRecipes }: any) {
         {/* Manual input */}
         <div style={{ display: 'flex', gap: 8 }}>
           <input
+            ref={manualInputRef}
             value={manualCode}
             onChange={e => setManualCode(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && manualCode.trim()) { handleScan(manualCode.trim()); setManualCode('') } }}
-            placeholder={isAR ? 'أدخل الباركود يدوياً...' : 'Enter barcode manually...'}
-            style={{ flex: 1, padding: '9px 12px', borderRadius: 9, border: '1px solid #d4d4d4', fontSize: 13, fontFamily: 'inherit', direction: 'ltr' }}
+            onKeyDown={e => { if (e.key === 'Enter' && manualCode.trim()) { handleScan(manualCode.trim()); setManualCode(''); setTimeout(() => manualInputRef.current?.focus(), 100) } }}
+            placeholder={isAR ? 'وجّه السكانر هنا أو أدخل الباركود...' : 'Scan here or enter barcode manually...'}
+            style={{ flex: 1, padding: '9px 12px', borderRadius: 9, border: '1.5px solid #16a679', fontSize: 13, fontFamily: 'inherit', direction: 'ltr' }}
+            autoComplete="off"
           />
           <button onClick={() => { if (manualCode.trim()) { handleScan(manualCode.trim()); setManualCode('') } }}
             className="btn btn-primary" style={{ padding: '9px 18px', whiteSpace: 'nowrap' }}>
