@@ -19,6 +19,7 @@ const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
     cashier:   <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>,
     settings:  <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
     scanner:   <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="5" height="5" rx="1"/><rect x="16" y="3" width="5" height="5" rx="1"/><rect x="3" y="16" width="5" height="5" rx="1"/><path d="M21 16h-3v3M18 21h3M13 3v5h5M13 13h3v3h-3v3M8 13v5M13 21v-2"/></svg>,
+    labels:    <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
     logout:    <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   }
   return icons[name] || null
@@ -36,6 +37,7 @@ const NAV_LABELS: Record<string, { ar: string; en: string }> = {
   users:      { ar: 'إدارة الحسابات', en: 'Users' },
   bakeries:   { ar: 'المنشآت',          en: 'Businesses' },
   scanner:    { ar: 'الماسح الضوئي',   en: 'Scanner' },
+  labels:     { ar: 'طباعة الملصقات',  en: 'Print Labels' },
   settings:   { ar: 'الإعدادات',       en: 'Settings' },
 }
 
@@ -77,6 +79,7 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
     if (isSuperAdmin) return false
     if (k === 'cashier') return false
     if (k === 'scanner') return user?.perms?.stock || user?.perms?.produce
+    if (k === 'labels') return user?.perms?.stock || user?.perms?.produce
     if (k === 'settings') return user?.role === 'admin'
     if (k === 'recipes') return user?.perms?.produce
     if (k === 'purchases') return user?.perms?.stock
