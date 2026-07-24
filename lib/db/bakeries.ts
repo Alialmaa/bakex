@@ -3,10 +3,40 @@ import { supabaseAdmin } from '../supabase'
 export async function listBakeries() {
   const { data, error } = await supabaseAdmin
     .from('bakeries')
-    .select('id, name, code, created_at')
+    .select('id, name, code, created_at, subscription_status, trial_ends_at, subscription_ends_at')
     .order('created_at')
   if (error) throw error
   return data
+}
+
+export async function updateBakerySubscription(
+  id: string,
+  action: 'activate' | 'extend_trial' | 'expire'
+) {
+  const now = Date.now()
+  let patch: Record<string, unknown>
+
+  if (action === 'activate') {
+    patch = {
+      subscription_status: 'active',
+      subscription_ends_at: new Date(now + 365 * 86_400_000).toISOString(),
+    }
+  } else if (action === 'extend_trial') {
+    patch = {
+      subscription_status: 'trial',
+      trial_ends_at: new Date(now + 30 * 86_400_000).toISOString(),
+      subscription_ends_at: null,
+    }
+  } else {
+    patch = {
+      subscription_status: 'expired',
+      trial_ends_at: new Date(now - 1).toISOString(),
+      subscription_ends_at: null,
+    }
+  }
+
+  const { error } = await supabaseAdmin.from('bakeries').update(patch).eq('id', id)
+  if (error) throw error
 }
 
 export async function getBakeryByCode(code: string) {
