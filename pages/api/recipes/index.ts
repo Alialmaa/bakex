@@ -14,6 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(await listRecipes(bakery_id))
     }
     if (req.method === 'POST') {
+      if (!user.perms?.produce && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
       const { name, units_per_batch, output_qty, sell_price, ingredients } = req.body
       const err = requireString(name, 'name')
         || requireNonNegativeNumber(units_per_batch, 'units_per_batch')
@@ -24,11 +25,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(await createRecipe(bakery_id, req.body))
     }
     if (req.method === 'PUT') {
+      if (!user.perms?.produce && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
       const { id, ...rest } = req.body
       if (typeof id !== 'string' || !id) return res.status(400).json({ error: 'id is required' })
       return res.status(200).json(await updateRecipe(id, bakery_id, rest))
     }
     if (req.method === 'DELETE') {
+      if (!user.perms?.produce && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
       await deleteRecipe(req.body.id, bakery_id)
       return res.status(200).json({ success: true })
     }

@@ -168,7 +168,7 @@ export default function ReportsPage({ user, initialData, initialTotals, initialP
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
   if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.reports) return { redirect: { destination: '/', permanent: false } }
+  if (!user.perms?.reports) return { redirect: { destination: '/403', permanent: false } }
 
   const monthStart = new Date().toISOString().slice(0, 7) + '-01'
   const bid = user.bakery_id

@@ -194,7 +194,7 @@ export default function UsersPage({ user, initialUsers }: any) {
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const user = getUser(req as any)
   if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.users) return { redirect: { destination: '/', permanent: false } }
+  if (!user.perms?.users) return { redirect: { destination: '/403', permanent: false } }
   const bid = user.bakery_id
   const { data } = bid
     ? await supabaseAdmin.from('users').select('id,name,username,role,perms,status,created_at').eq('bakery_id', bid).order('created_at')
