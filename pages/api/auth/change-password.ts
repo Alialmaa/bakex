@@ -1,0 +1,40 @@
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { requireAuth, comparePassword, hashPassword } from '../../../lib/auth'
+import { supabaseAdmin } from '../../../lib/supabase'
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') return res.status(405).end()
+  const user = await requireAuth(req, res)
+  if (!user) return
+
+  const { current_password, new_password } = req.body
+  if (typeof current_password !== 'string' || !current_password)
+    return res.status(400).json({ error: 'كلمة المرور الحالية مطلوبة' })
+  if (typeof new_password !== 'string' || new_password.length < 6)
+    return res.status(400).json({ error: 'كلمة المرور الجديدة يجب أن تكون ٦ أحرف على الأقل' })
+  if (current_password === new_password)
+    return res.status(400).json({ error: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية' })
+
+  const { data: dbUser } = await supabaseAdmin
+    .from('users').select('password_hash, token_version').eq('id', user.id).single()
+
+  if (!dbUser) return res.status(404).json({ error: 'المستخدم غير موجود' })
+
+  const stored = dbUser.password_hash as string
+  const valid = stored.startsWith('plain:')
+    ? stored === `plain:${current_password}`
+    : comparePassword(current_password, stored)
+
+  if (!valid) return res.status(401).json({ error: 'كلمة المرور الحالية غير صحيحة' })
+
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({
+      password_hash: hashPassword(new_password),
+      token_version: (dbUser.token_version ?? 0) + 1,
+    })
+    .eq('id', user.id)
+
+  if (error) return res.status(500).json({ error: error.message })
+  return res.status(200).json({ success: true })
+}
