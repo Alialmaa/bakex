@@ -10,8 +10,9 @@ export default function RegisterPage() {
   useEffect(() => {
     const e = new URLSearchParams(window.location.search).get('error')
     if (e === 'missing') setError('يرجى تعبئة جميع الحقول')
-    else if (e === 'short_password') setError('كلمة المرور قصيرة — ٤ أحرف على الأقل')
+    else if (e === 'short_password') setError('كلمة المرور قصيرة — ٦ أحرف على الأقل')
     else if (e === 'username_taken') setError('اسم المستخدم محجوز، اختر اسماً آخر')
+    else if (e === 'invalid_email') setError('البريد الإلكتروني غير صحيح')
     else if (e === 'create_failed') setError('حدث خطأ، حاول مرة أخرى')
     else if (e) setError(e)
   }, [])
@@ -82,6 +83,30 @@ export default function RegisterPage() {
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 13, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>اسم المستخدم</label>
               <input name="username" type="text" required placeholder="admin" dir="ltr"
+                style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', background: '#f8fafc', color: '#0f172a', outline: 'none', transition: 'border-color 0.15s' }}
+                onFocus={e => e.target.style.borderColor = GREEN}
+                onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>
+                البريد الإلكتروني
+                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400, marginRight: 6 }}>(للتواصل واسترجاع الحساب)</span>
+              </label>
+              <input name="email" type="email" required placeholder="example@email.com" dir="ltr"
+                style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', background: '#f8fafc', color: '#0f172a', outline: 'none', transition: 'border-color 0.15s' }}
+                onFocus={e => e.target.style.borderColor = GREEN}
+                onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>
+                رقم الجوال
+                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400, marginRight: 6 }}>(واتساب للدعم الفني)</span>
+              </label>
+              <input name="phone" type="tel" required placeholder="05xxxxxxxx" dir="ltr"
                 style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', background: '#f8fafc', color: '#0f172a', outline: 'none', transition: 'border-color 0.15s' }}
                 onFocus={e => e.target.style.borderColor = GREEN}
                 onBlur={e => e.target.style.borderColor = '#e2e8f0'}
