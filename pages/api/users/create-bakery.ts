@@ -9,17 +9,21 @@ import { checkRateLimit } from '../../../lib/rateLimit'
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { bakery_name, name, username, password } = req.body
-  if (!bakery_name || !name || !username || !password)
-    return res.redirect(302, '/?error=missing')
+  const { bakery_name, name, username, password, email, phone } = req.body
+  if (!bakery_name || !name || !username || !password || !email || !phone)
+    return res.redirect(302, '/register?error=missing')
   if (typeof bakery_name !== 'string' || bakery_name.length > 100)
-    return res.redirect(302, '/?error=invalid_input')
+    return res.redirect(302, '/register?error=invalid_input')
   if (typeof name !== 'string' || name.length > 100)
-    return res.redirect(302, '/?error=invalid_input')
+    return res.redirect(302, '/register?error=invalid_input')
   if (typeof username !== 'string' || username.length > 50)
-    return res.redirect(302, '/?error=invalid_input')
+    return res.redirect(302, '/register?error=invalid_input')
+  if (typeof email !== 'string' || email.length > 200 || !email.includes('@'))
+    return res.redirect(302, '/register?error=invalid_email')
+  if (typeof phone !== 'string' || phone.length > 20)
+    return res.redirect(302, '/register?error=invalid_input')
   if (password.length < 6)
-    return res.redirect(302, '/?error=short_password')
+    return res.redirect(302, '/register?error=short_password')
 
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
   const limit = await checkRateLimit(`register:${ip}`)
@@ -28,12 +32,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { data: existing } = await supabaseAdmin
       .from('users').select('id').eq('username', username).single()
-    if (existing) return res.redirect(302, '/?error=username_taken')
+    if (existing) return res.redirect(302, '/register?error=username_taken')
 
     const bakery = await createBakery(bakery_name)
     const perms = { dashboard: true, stock: true, produce: true, sales: true, cost: true, reports: true, users: true }
     const { data: newUser, error } = await supabaseAdmin.from('users').insert({
       name, username,
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
       password_hash: hashPassword(password),
       role: 'admin',
       perms,
@@ -41,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       status: 'active',
     }).select().single()
 
-    if (error || !newUser) return res.redirect(302, '/?error=create_failed')
+    if (error || !newUser) return res.redirect(302, '/register?error=create_failed')
 
     const token = signToken({
       id: newUser.id,
