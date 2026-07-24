@@ -1,4 +1,5 @@
 import { useRouter } from 'next/router'
+import { useEffect, useState } from 'react'
 import { T, Lang, ROLE_CONFIG } from '../lib/translations'
 
 // Clean SVG icons — no emojis
@@ -43,12 +44,31 @@ interface LayoutProps {
   setLang: (l: Lang) => void
 }
 
+type BillingInfo = { status: string; daysLeft: number; allowed: boolean } | null
+
 export default function Layout({ children, user, lang, setLang }: LayoutProps) {
   const router = useRouter()
   const t = T[lang]
   const rc = ROLE_CONFIG[user?.role as keyof typeof ROLE_CONFIG]
   const isRTL = lang === 'ar'
   const isSuperAdmin = user?.role === 'super_admin'
+
+  const [billing, setBilling] = useState<BillingInfo>(null)
+
+  useEffect(() => {
+    if (isSuperAdmin || !user?.bakery_id) return
+    fetch('/api/billing')
+      .then(r => r.json())
+      .then(d => setBilling(d))
+      .catch(() => {})
+  }, [user?.bakery_id])
+
+  const daysLeft = billing?.daysLeft ?? 0
+  const showBanner = billing && billing.status !== 'active' && billing.status !== 'super_admin'
+  const isExpired = billing?.status === 'expired'
+  const bannerBg = isExpired ? '#fef2f2' : daysLeft <= 3 ? '#fef3c7' : daysLeft <= 7 ? '#fff7ed' : '#f0fdf4'
+  const bannerColor = isExpired ? '#991b1b' : daysLeft <= 3 ? '#92400e' : daysLeft <= 7 ? '#9a3412' : '#166534'
+  const bannerBorder = isExpired ? '#fecaca' : daysLeft <= 3 ? '#fde68a' : daysLeft <= 7 ? '#fed7aa' : '#bbf7d0'
 
   const allowed = Object.keys(NAV_LABELS).filter(k => {
     if (k === 'bakeries') return isSuperAdmin
@@ -156,6 +176,23 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
             </button>
           </div>
         </div>
+
+        {/* Trial / expiry banner */}
+        {showBanner && (
+          <div style={{ background: bannerBg, borderBottom: `1px solid ${bannerBorder}`, padding: '9px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <span style={{ fontSize: 13, color: bannerColor, fontWeight: 500 }}>
+              {isExpired
+                ? 'انتهت فترة التجربة المجانية — يرجى الاشتراك للاستمرار'
+                : `تبقّى ${daysLeft} ${daysLeft === 1 ? 'يوم' : 'أيام'} من التجربة المجانية`
+              }
+            </span>
+            <button
+              onClick={() => router.push('/billing')}
+              style={{ background: isExpired ? '#dc2626' : '#16a679', color: '#fff', border: 'none', borderRadius: 7, padding: '5px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+              {isExpired ? 'اشترك الآن' : 'عرض الباقات'}
+            </button>
+          </div>
+        )}
 
         <div className="content">{children}</div>
       </div>

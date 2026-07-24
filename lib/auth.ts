@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { parse, serialize } from 'cookie'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from './supabase'
+import { checkBakeryAccess } from './subscription'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set. Refusing to start with an insecure default.')
@@ -42,7 +43,6 @@ export const getUser = (req: NextApiRequest) => {
 }
 
 // Per-user cache to avoid a DB roundtrip on every single request.
-// Entries expire after 30 s — fast enough to act on role/status changes.
 const _vc = new Map<string, { v: number; s: string; t: number }>()
 const VC_TTL = 30_000
 
@@ -62,12 +62,21 @@ async function isSessionValid(userId: string, tokenVersion: number): Promise<boo
     _vc.set(userId, { v: data.token_version ?? 0, s: data.status ?? 'active', t: now })
     return (data.token_version ?? 0) === tokenVersion && data.status === 'active'
   } catch {
-    // Column not yet migrated — don't break existing sessions, fail open
     return true
   }
 }
 
-export const requireAuth = async (req: NextApiRequest, res: NextApiResponse) => {
+export interface AuthOptions {
+  skipSubscription?: boolean
+}
+
+export const isSuperAdmin = (user: any) => user?.role === 'super_admin'
+
+export const requireAuth = async (
+  req: NextApiRequest,
+  res: NextApiResponse,
+  opts?: AuthOptions
+) => {
   const user = getUser(req)
   if (!user) { res.status(401).json({ error: 'Unauthorized' }); return null }
 
@@ -79,14 +88,29 @@ export const requireAuth = async (req: NextApiRequest, res: NextApiResponse) => 
     }
   }
 
+  if (user.bakery_id && !isSuperAdmin(user) && !opts?.skipSubscription) {
+    const access = await checkBakeryAccess(user.bakery_id)
+    if (!access.allowed) {
+      res.status(402).json({
+        error: 'subscription_expired',
+        status: access.status,
+        daysLeft: 0,
+      })
+      return null
+    }
+  }
+
   return user
 }
 
-export const requirePerm = async (req: NextApiRequest, res: NextApiResponse, perm: string) => {
-  const user = await requireAuth(req, res)
+export const requirePerm = async (
+  req: NextApiRequest,
+  res: NextApiResponse,
+  perm: string,
+  opts?: AuthOptions
+) => {
+  const user = await requireAuth(req, res, opts)
   if (!user) return null
   if (!user.perms?.[perm]) { res.status(403).json({ error: 'Forbidden' }); return null }
   return user
 }
-
-export const isSuperAdmin = (user: any) => user?.role === 'super_admin'
