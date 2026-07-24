@@ -125,7 +125,7 @@ export default function BillingPage() {
           {/* Subscribe CTA */}
           {!isActive && (
             <a
-              href="https://wa.me/966500000000?text=أريد الاشتراك في Bakex"
+              href="https://wa.me/966559219189?text=أريد الاشتراك في Bakex"
               target="_blank"
               rel="noopener noreferrer"
               style={{ display: 'block', width: '100%', background: GREEN, color: '#fff', border: 'none', borderRadius: 12, padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box', boxShadow: '0 4px 14px rgba(22,166,121,0.3)' }}>
