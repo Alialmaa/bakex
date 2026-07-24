@@ -19,6 +19,33 @@ export default function SettingsPage({ user }: any) {
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwError, setPwError] = useState('')
+  const [pwSaved, setPwSaved] = useState(false)
+
+  const handleChangePassword = async () => {
+    setPwError('')
+    if (!pwForm.current || !pwForm.next || !pwForm.confirm) { setPwError('يرجى تعبئة جميع الحقول'); return }
+    if (pwForm.next.length < 6) { setPwError('كلمة المرور الجديدة يجب أن تكون ٦ أحرف على الأقل'); return }
+    if (pwForm.next !== pwForm.confirm) { setPwError('كلمة المرور الجديدة وتأكيدها غير متطابقتين'); return }
+    setPwSaving(true)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: pwForm.current, new_password: pwForm.next }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPwSaved(true)
+        setPwForm({ current: '', next: '', confirm: '' })
+        setTimeout(() => setPwSaved(false), 4000)
+      } else {
+        setPwError(data.error || 'حدث خطأ')
+      }
+    } finally { setPwSaving(false) }
+  }
+
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(d => {
       if (d && !d.error) {
@@ -163,6 +190,48 @@ export default function SettingsPage({ user }: any) {
         <button onClick={handleSave} disabled={saving} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: 14 }}>
           {saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
         </button>
+
+        {/* Change Password */}
+        <div className="card">
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            تغيير كلمة المرور
+          </div>
+
+          {pwError && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 9, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {pwError}
+            </div>
+          )}
+
+          {pwSaved && (
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 9, padding: '10px 14px', fontSize: 13, color: '#166534', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+              تم تغيير كلمة المرور بنجاح — سيتم تسجيل خروجك من الأجهزة الأخرى
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12.5, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>كلمة المرور الحالية</label>
+              <input type="password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} placeholder="••••••••" dir="ltr" />
+            </div>
+            <div>
+              <label style={{ fontSize: 12.5, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>كلمة المرور الجديدة</label>
+              <input type="password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} placeholder="٦ أحرف على الأقل" dir="ltr" />
+            </div>
+            <div>
+              <label style={{ fontSize: 12.5, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>تأكيد كلمة المرور الجديدة</label>
+              <input type="password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} placeholder="••••••••" dir="ltr" />
+            </div>
+          </div>
+
+          <button onClick={handleChangePassword} disabled={pwSaving} className="btn" style={{ marginTop: 16, background: '#8b5cf6', color: '#fff', border: 'none', width: '100%', justifyContent: 'center', padding: '11px', fontSize: 13.5, fontWeight: 600 }}>
+            {pwSaving ? 'جاري التغيير...' : 'تغيير كلمة المرور'}
+          </button>
+        </div>
+
       </div>
     </Layout>
   )
