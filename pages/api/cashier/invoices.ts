@@ -12,12 +12,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!bakery_id) return res.status(403).json({ error: 'No bakery assigned to this account. Please log out and log in again.' })
 
   if (req.method === 'GET') {
-    const { from, to, limit = 50 } = req.query
+    const { from, to, limit = '50' } = req.query
     let query = supabaseAdmin
       .from('invoices')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(Number(limit))
+      .limit(Math.min(Math.max(1, Number(limit) || 50), 200))
 
     if (bakery_id) query = query.eq('bakery_id', bakery_id)
     if (from) query = query.gte('created_at', from as string)
@@ -103,6 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .from('recipes')
         .select('id, ingredients, units_per_batch, output_qty')
         .in('id', recipeIds)
+        .eq('bakery_id', bakery_id)
 
       if (recipes?.length) {
         for (const item of items) {
@@ -131,6 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 .from('stock')
                 .update({ qty: newQty })
                 .eq('id', stockItems[0].id)
+                .eq('bakery_id', bakery_id)
             }
           }
         }

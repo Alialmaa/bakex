@@ -52,6 +52,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Server-side redirect — cookie is guaranteed to be set before browser loads /dashboard
     return res.redirect(302, `/dashboard?new=1&bakery=${encodeURIComponent(bakery.code)}`)
   } catch (e: any) {
-    return res.redirect(302, `/?error=${encodeURIComponent(e.message || 'error')}`)
+    return res.redirect(302, '/?error=create_failed')
   }
 }

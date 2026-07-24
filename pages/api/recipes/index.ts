@@ -25,6 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (req.method === 'PUT') {
       const { id, ...rest } = req.body
+      if (typeof id !== 'string' || !id) return res.status(400).json({ error: 'id is required' })
       return res.status(200).json(await updateRecipe(id, bakery_id, rest))
     }
     if (req.method === 'DELETE') {

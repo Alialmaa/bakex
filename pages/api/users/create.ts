@@ -11,6 +11,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { name, username, password, role, perms } = req.body
   if (!name || !username || !password)
     return res.status(400).json({ error: 'Missing fields' })
+  if (typeof password !== 'string' || password.length < 6)
+    return res.status(400).json({ error: 'Password must be at least 6 characters' })
 
   try {
     const data = await createUser({
