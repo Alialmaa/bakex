@@ -10,11 +10,32 @@ export async function listSales(bakery_id: string | null, from?: string, to?: st
   return data
 }
 
-export async function createSales(bakery_id: string, entries: any[], sold_by: string, date?: string) {
+export interface SaleEntry {
+  recipe_id: string
+  recipe_name?: string
+  qty: number
+  unit_price: number
+}
+
+export async function createSales(bakery_id: string, entries: SaleEntry[], sold_by: string, date?: string) {
   const created_at = date
     ? new Date(date + 'T12:00:00').toISOString()
     : new Date().toISOString()
-  const rows = entries.map((e: any) => ({ ...e, bakery_id, sold_by, created_at }))
+
+  // Each column is set explicitly. This used to spread the caller's object
+  // (`{ ...e }`), which handed the client a direct write into every column of
+  // the table — including `total`, the figure every financial report sums.
+  const rows = entries.map(e => ({
+    recipe_id: e.recipe_id,
+    recipe_name: typeof e.recipe_name === 'string' ? e.recipe_name.slice(0, 200) : null,
+    qty: e.qty,
+    unit_price: e.unit_price,
+    total: Math.round(e.qty * e.unit_price * 100) / 100,
+    bakery_id,
+    sold_by,
+    created_at,
+  }))
+
   const { data, error } = await supabaseAdmin
     .from('sales')
     .insert(rows)
