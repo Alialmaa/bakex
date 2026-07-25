@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '../../../lib/auth'
 import { supabaseAdmin } from '../../../lib/supabase'
+import { apiError } from '../../../lib/apiError'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await requireAuth(req, res)
@@ -14,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .select('id,name,code,vat_number,cr_number,address,city,phone,business_type')
       .eq('id', bakery_id)
       .single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return apiError(res, error, 'settings')
     return res.status(200).json(data)
   }
 
@@ -29,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .eq('id', bakery_id)
       .select()
       .single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return apiError(res, error, 'settings')
     return res.status(200).json(data)
   }
 

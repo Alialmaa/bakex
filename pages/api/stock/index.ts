@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth, isSuperAdmin } from '../../../lib/auth'
 import { listStock, addStockItem, updateStockItem, deleteStockItem } from '../../../lib/db/stock'
 import { requireString, requireNonNegativeNumber } from '../../../lib/validate'
+import { apiError } from '../../../lib/apiError'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await requireAuth(req, res)
@@ -39,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true })
     }
     res.status(405).end()
-  } catch (e: any) {
-    res.status(500).json({ error: e.message })
+  } catch (e) {
+    return apiError(res, e, 'stock')
   }
 }

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '../../../lib/auth'
 import { supabaseAdmin } from '../../../lib/supabase'
 import { createSales } from '../../../lib/db/sales'
+import { apiError } from '../../../lib/apiError'
 
 const MAX_ITEMS = 200
 const MAX_QTY = 1_000_000
@@ -40,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (to) query = query.lte('created_at', to as string)
 
     const { data, error } = await query
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return apiError(res, error, 'invoices')
     return res.status(200).json(data)
   }
 
@@ -104,7 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { data: seqNum, error: seqErr } = await supabaseAdmin
       .rpc('next_invoice_seq', { p_bakery_id: bakery_id, p_date_key: dateStr })
-    if (seqErr) return res.status(500).json({ error: seqErr.message })
+    if (seqErr) return apiError(res, seqErr, 'invoices')
     const invoice_number = `INV-${dateStr}-${String(seqNum).padStart(4, '0')}`
 
     // 1. Create invoice record
@@ -125,7 +126,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .select()
       .single()
 
-    if (invoiceErr || !invoice) return res.status(500).json({ error: invoiceErr?.message || 'Failed to create invoice' })
+    if (invoiceErr || !invoice) return apiError(res, invoiceErr, 'invoices')
 
     // 2. Record sales entries (syncs with bakery dashboard + reports)
     try {

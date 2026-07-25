@@ -47,9 +47,14 @@ export async function getStockByName(name: string, bakery_id: string | null) {
 }
 
 export async function adjustStockQty(name: string, bakery_id: string, delta: number, newPrice?: number) {
-  const item = await getStockByName(name, bakery_id)
-  if (!item) return
-  const update: any = { qty: item.qty + delta }
-  if (newPrice !== undefined) update.price_per_unit = newPrice
-  await supabaseAdmin.from('stock').update(update).eq('id', item.id)
+  // Done in one statement. Reading the quantity and writing back qty + delta
+  // meant two purchases recorded at the same moment both read the old value,
+  // and one of the increments was silently lost.
+  const { error } = await supabaseAdmin.rpc('adjust_stock_qty', {
+    p_bakery_id: bakery_id,
+    p_name: name,
+    p_delta: delta,
+    p_new_price: newPrice ?? null,
+  })
+  if (error) throw error
 }

@@ -5,6 +5,7 @@ import { listRecipes } from '../../../lib/db/recipes'
 import { listStock } from '../../../lib/db/stock'
 import { listProduction } from '../../../lib/db/production'
 import { getPurchaseCostInRange } from '../../../lib/db/purchases'
+import { apiError } from '../../../lib/apiError'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).end()
@@ -89,8 +90,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         lastMonth: { revenue: prevRev, profit: prevProfit },
       },
     })
-  } catch (e: any) {
-    res.status(500).json({ error: e.message })
+  } catch (e) {
+    return apiError(res, e, 'reports')
   }
 }
 

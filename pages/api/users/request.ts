@@ -3,7 +3,9 @@ import { getBakeryByCode, createBakery } from '../../../lib/db/bakeries'
 import { requestUser } from '../../../lib/db/users'
 import { hashPassword, signToken, setAuthCookie } from '../../../lib/auth'
 import { supabaseAdmin } from '../../../lib/supabase'
-import { checkRateLimit } from '../../../lib/rateLimit'
+import { checkRateLimit, RATE_LIMITS } from '../../../lib/rateLimit'
+import { clientIp } from '../../../lib/clientIp'
+import { apiError } from '../../../lib/apiError'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -18,8 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (typeof password !== 'string' || password.length < 6)
     return res.status(400).json({ error: 'Password must be at least 6 characters' })
 
-  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
-  const limit = await checkRateLimit(`register:${ip}`)
+  const limit = await checkRateLimit(`register:${clientIp(req)}`, RATE_LIMITS.register)
   if (!limit.allowed) return res.status(429).json({ error: `Too many attempts. Try again in ${limit.retryAfterSec}s.` })
 
   try {
@@ -68,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(400).json({ error: 'Invalid mode' })
   } catch (e: any) {
-    const status = e.message === 'Username already taken' ? 409 : 500
-    res.status(status).json({ error: e.message })
+    if (e.message === 'Username already taken') return res.status(409).json({ error: e.message })
+    return apiError(res, e, 'users.request')
   }
 }

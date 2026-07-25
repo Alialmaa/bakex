@@ -1,11 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth, comparePassword, hashPassword, signToken, setAuthCookie, invalidateUserCache } from '../../../lib/auth'
 import { supabaseAdmin } from '../../../lib/supabase'
+import { checkRateLimit, RATE_LIMITS } from '../../../lib/rateLimit'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
   const user = await requireAuth(req, res)
   if (!user) return
+
+  const limit = await checkRateLimit(`chpw:${user.id}`, RATE_LIMITS.changePassword)
+  if (!limit.allowed)
+    return res.status(429).json({ error: 'محاولات كثيرة، حاول بعد قليل' })
 
   const { current_password, new_password } = req.body
   if (typeof current_password !== 'string' || !current_password)

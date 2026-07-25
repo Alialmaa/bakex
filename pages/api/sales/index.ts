@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth, isSuperAdmin } from '../../../lib/auth'
 import { listSales, createSales, deleteSale } from '../../../lib/db/sales'
+import { apiError } from '../../../lib/apiError'
 
 const MAX_ENTRIES = 500
 const MAX_QTY = 1_000_000
@@ -42,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true })
     }
     res.status(405).end()
-  } catch (e: any) {
-    res.status(500).json({ error: e.message })
+  } catch (e) {
+    return apiError(res, e, 'sales')
   }
 }

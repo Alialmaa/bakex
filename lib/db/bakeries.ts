@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../supabase'
+import { generateCode } from '../crypto'
 
 export async function listBakeries() {
   const { data, error } = await supabaseAdmin
@@ -72,9 +73,4 @@ export async function getBakeryUserCount(bakery_id: string) {
     .select('*', { count: 'exact', head: true })
     .eq('bakery_id', bakery_id)
   return count ?? 0
-}
-
-function generateCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }

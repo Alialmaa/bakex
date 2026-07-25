@@ -3,7 +3,8 @@ import crypto from 'crypto'
 import { createBakery } from '../../../lib/db/bakeries'
 import { hashPassword } from '../../../lib/auth'
 import { supabaseAdmin } from '../../../lib/supabase'
-import { checkRateLimit } from '../../../lib/rateLimit'
+import { checkRateLimit, RATE_LIMITS } from '../../../lib/rateLimit'
+import { clientIp } from '../../../lib/clientIp'
 import { sendVerificationEmail } from '../../../lib/email'
 import { appUrl } from '../../../lib/appUrl'
 
@@ -26,8 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (password.length < 6)
     return res.redirect(302, '/register?error=short_password')
 
-  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
-  const limit = await checkRateLimit(`register:${ip}`)
+  const limit = await checkRateLimit(`register:${clientIp(req)}`, RATE_LIMITS.register)
   if (!limit.allowed) return res.redirect(302, '/register?error=rate_limited')
 
   try {

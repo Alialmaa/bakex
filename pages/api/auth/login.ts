@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '../../../lib/supabase'
 import { comparePassword, hashPassword, signToken, setAuthCookie } from '../../../lib/auth'
-import { checkRateLimit } from '../../../lib/rateLimit'
+import { timingSafeEqualStr } from '../../../lib/crypto'
+import { checkRateLimit, peekRateLimit, resetRateLimit, RATE_LIMITS } from '../../../lib/rateLimit'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -11,15 +12,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
-  const limit = await checkRateLimit(`login:${ip}:${username.toLowerCase()}`)
-  if (!limit.allowed) {
-    return res.status(429).json({ error: `Too many attempts. Try again in ${limit.retryAfterSec}s.` })
+  const uname = username.toLowerCase()
+
+  const ipLimit = await checkRateLimit(`login:ip:${ip}:${uname}`, RATE_LIMITS.login)
+  if (!ipLimit.allowed) {
+    return res.status(429).json({ error: `Too many attempts. Try again in ${ipLimit.retryAfterSec}s.` })
+  }
+
+  // A second limit on the account itself, so rotating IPs no longer resets the
+  // counter. Read without incrementing, and only failures below add to it —
+  // otherwise anyone could lock a victim out by guessing at their username.
+  const acctKey = `login:acct:${uname}`
+  const acctLimit = await peekRateLimit(acctKey, RATE_LIMITS.loginAccount)
+  if (!acctLimit.allowed) {
+    return res.status(429).json({ error: `Too many attempts. Try again in ${acctLimit.retryAfterSec}s.` })
+  }
+
+  const failed = async () => {
+    await checkRateLimit(acctKey, RATE_LIMITS.loginAccount)
+    return res.status(401).json({ error: 'Invalid credentials' })
   }
 
   const { data: user } = await supabaseAdmin
     .from('users').select('*').eq('username', username).single()
 
-  if (!user) return res.status(401).json({ error: 'Invalid credentials' })
+  if (!user) return failed()
 
   const stored = user.password_hash as string
   let valid = false
@@ -35,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     valid = comparePassword(password, stored)
   }
 
-  if (!valid) return res.status(401).json({ error: 'Invalid credentials' })
+  if (!valid) return failed()
 
   if (user.status === 'pending')
     return res.status(403).json({ error: 'Account pending approval. Please contact admin.' })
@@ -62,7 +79,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!access_code) {
       return res.status(200).json({ needs_code: true })
     }
-    if (access_code !== bakery_access_code) {
+    if (typeof access_code !== 'string' || !timingSafeEqualStr(access_code, bakery_access_code)) {
+      await checkRateLimit(acctKey, RATE_LIMITS.loginAccount)
       return res.status(401).json({ error: 'كود الدخول غير صحيح' })
     }
   }
@@ -77,6 +95,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     bakery_name,
     tv: user.token_version ?? 0,
   })
+
+  // Correct credentials clear the account counter, so someone guessing against
+  // an account can never keep its owner out.
+  await resetRateLimit(acctKey)
 
   setAuthCookie(res, token)
   res.status(200).json({ success: true })

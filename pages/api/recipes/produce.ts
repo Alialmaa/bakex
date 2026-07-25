@@ -35,57 +35,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  // Check stock for all batches — scoped to this bakery
-  for (const ing of ingredients) {
-    const { data: mat } = await supabaseAdmin
-      .from('stock').select('*').eq('name', ing.material).eq('bakery_id', bakery_id).single()
-    const needed = ing.amount * batches
-    if (!mat || typeof mat.qty !== 'number' || !(mat.qty >= needed)) {
-      return res.status(400).json({ error: `Insufficient: ${ing.material}` })
-    }
-  }
-
-  // Deduct stock — scoped to this bakery
-  for (const ing of ingredients) {
-    const { data: mat } = await supabaseAdmin
-      .from('stock').select('qty').eq('name', ing.material).eq('bakery_id', bakery_id).single()
-    const needed = ing.amount * batches
-    await supabaseAdmin
-      .from('stock').update({ qty: Math.max(0, mat!.qty - needed) })
-      .eq('name', ing.material).eq('bakery_id', bakery_id)
-  }
-
-  // Log production with bakery_id
-  const totalUnits = (recipe.units_per_batch || recipe.output_qty) * batches
-  await supabaseAdmin.from('production_log').insert({
-    recipe_id, recipe_name: recipe.name,
-    output_qty: totalUnits, output_unit: recipe.output_unit,
-    produced_by: user.id, bakery_id,
+  // One call does the whole sequence inside a single transaction. Checking
+  // every ingredient and then deducting in a second pass meant two requests
+  // arriving together both passed the check and both deducted, producing twice
+  // the goods from one set of materials.
+  const { data, error } = await supabaseAdmin.rpc('produce_recipe', {
+    p_bakery_id: bakery_id,
+    p_recipe_id: recipe_id,
+    p_batches: batches,
+    p_user_id: user.id,
   })
 
-  // Add finished goods to stock
-  const { data: existingFinished } = await supabaseAdmin
-    .from('stock')
-    .select('id, qty')
-    .eq('name', recipe.name)
-    .eq('bakery_id', bakery_id)
-    .maybeSingle()
-
-  if (existingFinished) {
-    await supabaseAdmin
-      .from('stock')
-      .update({ qty: (existingFinished.qty || 0) + totalUnits })
-      .eq('id', existingFinished.id)
-  } else {
-    await supabaseAdmin
-      .from('stock')
-      .insert({
-        bakery_id,
-        name: recipe.name,
-        qty: totalUnits,
-        unit: recipe.output_unit || 'حبة',
-      })
+  if (error) {
+    const m = /insufficient:(.*)$/.exec(error.message || '')
+    if (m) return res.status(400).json({ error: `Insufficient: ${m[1].trim()}` })
+    if ((error.message || '').includes('invalid_ingredient')) {
+      return res.status(400).json({ error: 'This recipe has an invalid ingredient — edit it before producing' })
+    }
+    console.error('produce_recipe failed:', error)
+    return res.status(500).json({ error: 'Could not record production' })
   }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (row?.shortage === 'recipe_not_found') return res.status(404).json({ error: 'Recipe not found' })
+  if (row?.shortage) return res.status(400).json({ error: row.shortage })
+
+  const totalUnits = Number(row?.total_units ?? 0)
 
   res.status(200).json({ success: true, totalUnits })
 }

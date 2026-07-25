@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '../../../lib/auth'
 import { supabaseAdmin } from '../../../lib/supabase'
+import { apiError } from '../../../lib/apiError'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -20,6 +21,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .eq('id', id)
     .eq('bakery_id', user.bakery_id)
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return apiError(res, error, 'scanner.assign')
   return res.status(200).json({ success: true })
 }

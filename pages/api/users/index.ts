@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requirePerm } from '../../../lib/auth'
 import { listUsers, updateUser, deleteUser } from '../../../lib/db/users'
 import { logAudit } from '../../../lib/audit'
+import { apiError } from '../../../lib/apiError'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await requirePerm(req, res, 'users')
@@ -58,7 +59,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     res.status(405).end()
   } catch (e: any) {
-    const status = e.message?.startsWith('Cannot ') ? 403 : e.message === 'User not found' ? 404 : 500
-    res.status(status).json({ error: e.message })
+    if (e.message?.startsWith('Cannot ')) return res.status(403).json({ error: e.message })
+    if (e.message === 'User not found') return res.status(404).json({ error: e.message })
+    return apiError(res, e, 'users')
   }
 }

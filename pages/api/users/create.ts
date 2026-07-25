@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { requirePerm } from '../../../lib/auth'
 import { createUser } from '../../../lib/db/users'
+import { apiError } from '../../../lib/apiError'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -39,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     })
     res.status(200).json({ success: true, user: data })
   } catch (e: any) {
-    const status = e.message === 'Username already taken' ? 409 : 500
-    res.status(status).json({ error: e.message })
+    if (e.message === 'Username already taken') return res.status(409).json({ error: e.message })
+    return apiError(res, e, 'users.create')
   }
 }
