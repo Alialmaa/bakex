@@ -3,10 +3,15 @@ import { supabaseAdmin } from '../supabase'
 export async function listBakeries() {
   const { data, error } = await supabaseAdmin
     .from('bakeries')
-    .select('id, name, code, created_at, subscription_status, trial_ends_at, subscription_ends_at')
+    .select('id, name, code, access_code, created_at, subscription_status, trial_ends_at, subscription_ends_at')
     .order('created_at')
   if (error) throw error
   return data
+}
+
+export async function updateBakeryAccessCode(id: string, access_code: string | null) {
+  const { error } = await supabaseAdmin.from('bakeries').update({ access_code }).eq('id', id)
+  if (error) throw error
 }
 
 export async function updateBakerySubscription(

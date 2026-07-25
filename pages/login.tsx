@@ -11,6 +11,8 @@ export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
+  const [accessCode, setAccessCode] = useState('')
+  const [step, setStep] = useState<'credentials' | 'code'>('credentials')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const isAR = lang === 'ar'
@@ -25,10 +27,31 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password })
       })
       const data = await res.json()
-      // The destination page itself re-checks permissions and redirects to the
-      // right place if this choice doesn't match the account's actual access.
-      if (res.ok) { window.location.href = mode === 'cashier' ? '/cashier' : '/dashboard' }
-      else setError(data.error || (isAR ? 'بيانات غير صحيحة' : 'Invalid credentials'))
+      if (res.ok && data.needs_code) {
+        setStep('code')
+      } else if (res.ok) {
+        window.location.href = mode === 'cashier' ? '/cashier' : '/dashboard'
+      } else {
+        setError(data.error || (isAR ? 'بيانات غير صحيحة' : 'Invalid credentials'))
+      }
+    } finally { setLoading(false) }
+  }
+
+  const handleCodeSubmit = async () => {
+    setError('')
+    if (!accessCode.trim()) { setError('أدخل كود الدخول'); return }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, access_code: accessCode.trim() })
+      })
+      const data = await res.json()
+      if (res.ok && !data.needs_code) {
+        window.location.href = mode === 'cashier' ? '/cashier' : '/dashboard'
+      } else {
+        setError(data.error || 'كود الدخول غير صحيح')
+      }
     } finally { setLoading(false) }
   }
 
@@ -42,69 +65,88 @@ export default function LoginPage() {
         </div>
 
         <div className="card" style={{ padding: '28px 32px' }}>
-          <div style={{ fontSize: 16, fontWeight: 500, textAlign: 'center', marginBottom: 4 }}>
-            {isAR ? 'تسجيل الدخول' : 'Login'}
-          </div>
-          <div style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 16 }}>
-            {isAR ? 'اختر نوع الدخول' : 'Choose how you want to sign in'}
-          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
-            <button
-              onClick={() => setMode('system')}
-              style={{
-                padding: '12px 8px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
-                border: `2px solid ${mode === 'system' ? '#1D9E75' : '#e2e8f0'}`,
-                background: mode === 'system' ? '#ecfdf5' : '#fff',
-                color: mode === 'system' ? '#0d7a5a' : '#64748b',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                fontWeight: mode === 'system' ? 700 : 500,
-              }}>
-              <span style={{ fontSize: 20 }}>🏢</span>
-              <span style={{ fontSize: 12.5 }}>{isAR ? 'نظام الإدارة' : 'Management'}</span>
-            </button>
-            <button
-              onClick={() => setMode('cashier')}
-              style={{
-                padding: '12px 8px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
-                border: `2px solid ${mode === 'cashier' ? '#6366f1' : '#e2e8f0'}`,
-                background: mode === 'cashier' ? '#eef2ff' : '#fff',
-                color: mode === 'cashier' ? '#4338ca' : '#64748b',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                fontWeight: mode === 'cashier' ? 700 : 500,
-              }}>
-              <span style={{ fontSize: 20 }}>🧾</span>
-              <span style={{ fontSize: 12.5 }}>{isAR ? 'الكاشير' : 'Cashier'}</span>
-            </button>
-          </div>
+          {step === 'credentials' ? (
+            <>
+              <div style={{ fontSize: 16, fontWeight: 500, textAlign: 'center', marginBottom: 4 }}>
+                {isAR ? 'تسجيل الدخول' : 'Login'}
+              </div>
+              <div style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 16 }}>
+                {isAR ? 'اختر نوع الدخول' : 'Choose how you want to sign in'}
+              </div>
 
-          {error && <div className="alert alert-error">⚠ {error}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+                <button onClick={() => setMode('system')} style={{ padding: '12px 8px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', border: `2px solid ${mode === 'system' ? '#1D9E75' : '#e2e8f0'}`, background: mode === 'system' ? '#ecfdf5' : '#fff', color: mode === 'system' ? '#0d7a5a' : '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontWeight: mode === 'system' ? 700 : 500 }}>
+                  <span style={{ fontSize: 20 }}>🏢</span>
+                  <span style={{ fontSize: 12.5 }}>{isAR ? 'نظام الإدارة' : 'Management'}</span>
+                </button>
+                <button onClick={() => setMode('cashier')} style={{ padding: '12px 8px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', border: `2px solid ${mode === 'cashier' ? '#6366f1' : '#e2e8f0'}`, background: mode === 'cashier' ? '#eef2ff' : '#fff', color: mode === 'cashier' ? '#4338ca' : '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontWeight: mode === 'cashier' ? 700 : 500 }}>
+                  <span style={{ fontSize: 20 }}>🧾</span>
+                  <span style={{ fontSize: 12.5 }}>{isAR ? 'الكاشير' : 'Cashier'}</span>
+                </button>
+              </div>
 
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 5 }}>{isAR ? 'اسم المستخدم' : 'Username'}</div>
-            <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder={isAR ? 'اسم المستخدم' : 'Username'} dir="ltr" onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-          </div>
+              {error && <div className="alert alert-error">⚠ {error}</div>}
 
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 5 }}>{isAR ? 'كلمة المرور' : 'Password'}</div>
-            <div style={{ position: 'relative' }}>
-              <input type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" dir="ltr" onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-              <button onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', [isAR ? 'left' : 'right']: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: 14 }}>
-                {showPass ? '🙈' : '👁'}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 5 }}>{isAR ? 'اسم المستخدم' : 'Username'}</div>
+                <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder={isAR ? 'اسم المستخدم' : 'Username'} dir="ltr" onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 5 }}>{isAR ? 'كلمة المرور' : 'Password'}</div>
+                <div style={{ position: 'relative' }}>
+                  <input type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" dir="ltr" onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+                  <button onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', [isAR ? 'left' : 'right']: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: 14 }}>
+                    {showPass ? '🙈' : '👁'}
+                  </button>
+                </div>
+              </div>
+
+              <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '11px 0' }} onClick={handleLogin} disabled={loading}>
+                {loading ? '...' : (isAR ? 'دخول' : 'Login')}
               </button>
-            </div>
-          </div>
 
-          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '11px 0' }} onClick={handleLogin} disabled={loading}>
-            {loading ? '...' : (isAR ? 'دخول' : 'Login')}
-          </button>
+              <div style={{ textAlign: 'center', marginTop: 14 }}>
+                <button onClick={() => router.push('/forgot-password')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12.5, color: '#888', fontFamily: 'inherit', textDecoration: 'underline' }}>
+                  {isAR ? 'نسيت كلمة المرور؟' : 'Forgot password?'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <div style={{ width: 48, height: 48, background: '#f0fdf4', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a679" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>أدخل كود الدخول</div>
+                <div style={{ fontSize: 12.5, color: '#64748b' }}>الكود الخاص بمنشأتك — تواصل مع المدير للحصول عليه</div>
+              </div>
 
-          <div style={{ textAlign: 'center', marginTop: 14 }}>
-            <button onClick={() => router.push('/forgot-password')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12.5, color: '#888', fontFamily: 'inherit', textDecoration: 'underline' }}>
-              {isAR ? 'نسيت كلمة المرور؟' : 'Forgot password?'}
-            </button>
-          </div>
+              {error && <div className="alert alert-error">⚠ {error}</div>}
+
+              <div style={{ marginBottom: 20 }}>
+                <input
+                  type="text" value={accessCode}
+                  onChange={e => setAccessCode(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleCodeSubmit()}
+                  placeholder="XXXX-XXXX" dir="ltr"
+                  style={{ textAlign: 'center', fontSize: 20, fontWeight: 700, letterSpacing: '0.1em' }}
+                  autoFocus
+                />
+              </div>
+
+              <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '11px 0' }} onClick={handleCodeSubmit} disabled={loading}>
+                {loading ? '...' : 'تأكيد'}
+              </button>
+
+              <div style={{ textAlign: 'center', marginTop: 12 }}>
+                <button onClick={() => { setStep('credentials'); setAccessCode(''); setError('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12.5, color: '#888', fontFamily: 'inherit', textDecoration: 'underline' }}>
+                  رجوع
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 12, display: 'flex', justifyContent: 'center', gap: 6 }}>

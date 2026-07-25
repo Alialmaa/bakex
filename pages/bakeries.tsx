@@ -11,6 +11,7 @@ interface Bakery {
   id: string
   name: string
   code: string
+  access_code: string | null
   created_at: string
   user_count: number
   subscription_status: string | null
@@ -71,6 +72,9 @@ export default function BakeriesPage({ user, bakeries: initial }: { user: any; b
   const [error, setError] = useState('')
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [editCodeId, setEditCodeId] = useState<string | null>(null)
+  const [codeInput, setCodeInput] = useState('')
+  const [codeSaving, setCodeSaving] = useState(false)
 
   const handleCreate = async () => {
     if (!newName.trim()) return
@@ -116,6 +120,27 @@ export default function BakeriesPage({ user, bakeries: initial }: { user: any; b
         }))
       }
     } finally { setLoadingId(null) }
+  }
+
+  const handleSetAccessCode = async (id: string, code: string | null) => {
+    setCodeSaving(true)
+    try {
+      const res = await fetch('/api/bakeries', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'set_access_code', access_code: code }),
+      })
+      if (res.ok) {
+        setBakeries(bs => bs.map(b => b.id === id ? { ...b, access_code: code || null } : b))
+        setEditCodeId(null)
+        setCodeInput('')
+      }
+    } finally { setCodeSaving(false) }
+  }
+
+  const generateAccessCode = () => {
+    const chars = '0123456789'
+    const part = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+    return `${part()}-${part()}`
   }
 
   const counts = {
@@ -170,6 +195,7 @@ export default function BakeriesPage({ user, bakeries: initial }: { user: any; b
                 <tr style={{ background: '#f8f8f6', borderBottom: '1px solid #e5e5e5' }}>
                   <th style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 600 }}>البيكري</th>
                   <th style={{ padding: '11px 16px', textAlign: 'center', fontWeight: 600 }}>الكود</th>
+                  <th style={{ padding: '11px 16px', textAlign: 'center', fontWeight: 600 }}>كود الدخول</th>
                   <th style={{ padding: '11px 16px', textAlign: 'center', fontWeight: 600 }}>المستخدمون</th>
                   <th style={{ padding: '11px 16px', textAlign: 'center', fontWeight: 600 }}>تاريخ الإنشاء</th>
                   <th style={{ padding: '11px 16px', textAlign: 'center', fontWeight: 600 }}>الاشتراك</th>
@@ -188,6 +214,57 @@ export default function BakeriesPage({ user, bakeries: initial }: { user: any; b
                         <span style={{ fontFamily: 'monospace', letterSpacing: 2, background: '#E1F5EE', color: '#085041', padding: '3px 10px', borderRadius: 6 }}>
                           {b.code}
                         </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center', minWidth: 180 }}>
+                        {editCodeId === b.id ? (
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'center' }}>
+                            <input
+                              value={codeInput}
+                              onChange={e => setCodeInput(e.target.value)}
+                              placeholder="0000-0000"
+                              dir="ltr"
+                              style={{ width: 100, padding: '4px 8px', fontSize: 13, fontFamily: 'monospace', textAlign: 'center', borderRadius: 6, border: '1.5px solid #cbd5e1' }}
+                            />
+                            <button onClick={() => handleSetAccessCode(b.id, codeInput || null)} disabled={codeSaving}
+                              style={{ background: GREEN, color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
+                              {codeSaving ? '...' : 'حفظ'}
+                            </button>
+                            <button onClick={() => { setEditCodeId(null); setCodeInput('') }}
+                              style={{ background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+                            {b.access_code ? (
+                              <span style={{ fontFamily: 'monospace', letterSpacing: 2, background: '#eff6ff', color: '#1e40af', padding: '3px 10px', borderRadius: 6, fontSize: 13 }}>
+                                {b.access_code}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: 12, color: '#94a3b8' }}>غير محدد</span>
+                            )}
+                            <button
+                              onClick={() => { setEditCodeId(b.id); setCodeInput(b.access_code || '') }}
+                              title="تعديل كود الدخول"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 2, fontSize: 14 }}>
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => { const c = generateAccessCode(); handleSetAccessCode(b.id, c) }}
+                              title="توليد كود عشوائي"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 2, fontSize: 14 }}>
+                              🎲
+                            </button>
+                            {b.access_code && (
+                              <button
+                                onClick={() => handleSetAccessCode(b.id, null)}
+                                title="حذف كود الدخول"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', padding: 2, fontSize: 14 }}>
+                                🗑️
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', color: '#555' }}>{b.user_count}</td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', color: '#888' }}>
@@ -263,7 +340,7 @@ export default function BakeriesPage({ user, bakeries: initial }: { user: any; b
                 })}
                 {bakeries.length === 0 && (
                   <tr>
-                    <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#888' }}>
+                    <td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#888' }}>
                       لا توجد بيكريات بعد
                     </td>
                   </tr>
