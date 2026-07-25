@@ -13,7 +13,14 @@ export async function addStockItem(bakery_id: string | null, item: {
 }) {
   const { data, error } = await supabaseAdmin
     .from('stock')
-    .insert({ ...item, bakery_id })
+    .insert({
+      name: item.name,
+      qty: item.qty,
+      unit: item.unit,
+      min_qty: item.min_qty,
+      price_per_unit: item.price_per_unit,
+      bakery_id,
+    })
     .select()
     .single()
   if (error) throw error

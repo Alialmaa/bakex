@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth, isSuperAdmin } from '../../../lib/auth'
 import { listSales, createSales, deleteSale } from '../../../lib/db/sales'
 import { apiError } from '../../../lib/apiError'
+import { logAudit } from '../../../lib/audit'
 
 const MAX_ENTRIES = 500
 const MAX_QTY = 1_000_000
@@ -39,7 +40,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (req.method === 'DELETE') {
       if (!user.perms?.sales && !isSuperAdmin(user)) return res.status(403).json({ error: 'Forbidden' })
+      // Deleting a sale removes revenue from every report. Without a record of
+      // who did it, skimming leaves no trace at all.
       await deleteSale(req.body.id, bakery_id)
+      await logAudit({ bakery_id, actor_id: user.id, actor_name: user.name,
+        action: 'sale.delete', target_type: 'sale', target_id: req.body.id })
       return res.status(200).json({ success: true })
     }
     res.status(405).end()

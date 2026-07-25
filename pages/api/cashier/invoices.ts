@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '../../../lib/auth'
 import { supabaseAdmin } from '../../../lib/supabase'
 import { createSales } from '../../../lib/db/sales'
+import { adjustStockQty } from '../../../lib/db/stock'
 import { apiError } from '../../../lib/apiError'
 
 const MAX_ITEMS = 200
@@ -46,7 +47,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'POST') {
-    if (!user.perms?.sales && !user.perms?.cashier) return res.status(403).json({ error: 'Forbidden' })
+    // `cashier` used to be tested here too, but it is absent from ALLOWED_PERMS
+    // in the user routes, so it could never be granted and the check was dead.
+    if (!user.perms?.sales) return res.status(403).json({ error: 'Forbidden' })
     const { customer_name, items, payment_method } = req.body
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -143,21 +146,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // 3. Deduct finished goods from stock (items added to stock during produce step)
+    //    One statement per item. Reading the quantity and writing back the
+    //    difference meant two tills selling the same product at once both read
+    //    the same figure, and one of the deductions was lost.
     try {
-      for (const item of items) {
-        const { data: stockItem } = await supabaseAdmin
-          .from('stock')
-          .select('id, qty')
-          .eq('name', item.name)
-          .eq('bakery_id', bakery_id)
-          .maybeSingle()
-
-        if (stockItem) {
-          await supabaseAdmin
-            .from('stock')
-            .update({ qty: Math.max(0, (stockItem.qty || 0) - item.qty) })
-            .eq('id', stockItem.id)
-        }
+      for (const item of safeItems) {
+        await adjustStockQty(item.name, bakery_id, -item.qty)
       }
     } catch (e) {
       console.error('Stock deduction error:', e)

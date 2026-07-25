@@ -15,7 +15,20 @@ export async function createPurchase(bakery_id: string, created_by: string, purc
 }) {
   const { data, error } = await supabaseAdmin
     .from('purchases')
-    .insert({ ...purchase, bakery_id, created_by })
+    // Named explicitly rather than spread. The caller happens to build this
+    // object from validated fields today, but the same spread in createSales
+    // was a direct write into every column of the table.
+    .insert({
+      material_name: purchase.material_name,
+      qty: purchase.qty,
+      unit: purchase.unit,
+      pack_weight: purchase.pack_weight ?? null,
+      pack_price: purchase.pack_price ?? null,
+      price_per_unit: purchase.price_per_unit,
+      notes: purchase.notes ?? null,
+      bakery_id,
+      created_by,
+    })
     .select()
     .single()
   if (error) throw error
