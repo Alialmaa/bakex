@@ -24,13 +24,8 @@ export default function Landing() {
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => router.push('/')}>
-          <div style={{ width: 34, height: 34, background: G, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3"/>
-            </svg>
-          </div>
-          <span style={{ fontWeight: 800, fontSize: 20, color: '#fff', letterSpacing: '-0.3px' }}>Bake<span style={{ color: G }}>x</span></span>
+        <div style={{ cursor: 'pointer' }} onClick={() => router.push('/')}>
+          <span style={{ fontWeight: 800, fontSize: 22, color: '#fff', letterSpacing: '-0.6px' }}>Bake<span style={{ color: G }}>x</span></span>
         </div>
 
         {/* Links */}
@@ -372,11 +367,8 @@ export default function Landing() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 40, paddingBottom: 44, borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: 28 }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                <div style={{ width: 34, height: 34, background: G, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3"/></svg>
-                </div>
-                <span style={{ fontWeight: 900, fontSize: 20, color: '#fff' }}>Bake<span style={{ color: G }}>x</span></span>
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ fontWeight: 800, fontSize: 22, color: '#fff', letterSpacing: '-0.6px' }}>Bake<span style={{ color: G }}>x</span></span>
               </div>
               <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.35)', lineHeight: 1.85, maxWidth: 240 }}>حلول متكاملة لإدارة المخابز السعودية من المخزون حتى الكاشير.</p>
             </div>

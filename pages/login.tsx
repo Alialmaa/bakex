@@ -89,13 +89,8 @@ export default function LoginPage() {
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none' }} />
 
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
-          <div style={{ width: 36, height: 36, background: G, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3"/>
-            </svg>
-          </div>
-          <span style={{ fontWeight: 800, fontSize: 22, color: '#fff', letterSpacing: '-0.3px' }}>
+        <div style={{ position: 'relative' }}>
+          <span style={{ fontWeight: 800, fontSize: 25, color: '#fff', letterSpacing: '-0.7px' }}>
             Bake<span style={{ color: G }}>x</span>
           </span>
         </div>

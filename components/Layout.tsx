@@ -101,21 +101,14 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
 
         {/* Logo */}
         <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 34, height: 34, background: 'var(--green)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3"/>
-              </svg>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: 21, letterSpacing: '-0.6px', color: '#fff', lineHeight: 1.1 }}>
+              Bake<span style={{ color: 'var(--green)' }}>x</span>
             </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 15.5, letterSpacing: '-0.3px', color: '#fff' }}>
-                Bake<span style={{ color: 'var(--green)' }}>x</span>
-              </div>
-              {user?.bakery_name
-                ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.bakery_name}</div>
-                : <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.07em' }}>BAKERY MGMT</div>
-              }
-            </div>
+            {user?.bakery_name
+              ? <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', fontWeight: 500, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.bakery_name}</div>
+              : <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.07em', marginTop: 3 }}>BAKERY MGMT</div>
+            }
           </div>
         </div>
 
