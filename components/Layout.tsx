@@ -100,27 +100,27 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
       <div className={`sidebar ${isRTL ? 'sidebar-rtl' : ''}`}>
 
         {/* Logo */}
-        <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid #f0f0f0' }}>
+        <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, background: 'var(--green)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 11l19-9-9 19-2-8-8-2z"/>
+            <div style={{ width: 34, height: 34, background: 'var(--green)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3"/>
               </svg>
             </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.3px', color: '#111' }}>
-                Bakex
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 15.5, letterSpacing: '-0.3px', color: '#fff' }}>
+                Bake<span style={{ color: 'var(--green)' }}>x</span>
               </div>
               {user?.bakery_name
-                ? <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 500, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.bakery_name}</div>
-                : <div style={{ fontSize: 10, color: 'var(--gray-400)', letterSpacing: '0.05em' }}>BAKERY MGMT</div>
+                ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.bakery_name}</div>
+                : <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.07em' }}>BAKERY MGMT</div>
               }
             </div>
           </div>
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '8px 0' }}>
+        <nav style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
           {allowed.map(k => (
             <div
               key={k}
@@ -133,18 +133,24 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
           ))}
         </nav>
 
-        {/* User info */}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0' }}>
+        {/* User info + logout */}
+        <div style={{ padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div className="avatar" style={{ width: 30, height: 30, background: rc?.bg || '#f3f4f6', color: rc?.color || '#374151', fontSize: 12 }}>
+            <div className="avatar" style={{ width: 32, height: 32, background: 'var(--green)', color: '#fff', fontSize: 13, flexShrink: 0 }}>
               {user?.name?.charAt(0)?.toUpperCase()}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--gray-400)' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
                 {t.roles[user?.role as keyof typeof t.roles]}
               </div>
             </div>
+            <button onClick={handleLogout} title={t.logout}
+              style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 7, padding: 7, cursor: 'pointer', color: 'rgba(255,255,255,0.45)', display: 'flex', alignItems: 'center', flexShrink: 0, transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#fff' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.45)' }}>
+              <Icon name="logout" size={14} />
+            </button>
           </div>
         </div>
       </div>
@@ -154,11 +160,13 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
 
         {/* Topbar */}
         <div className="topbar">
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
-            {NAV_LABELS[currentPage]?.[lang] || NAV_LABELS.dashboard[lang]}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-900)', letterSpacing: '-0.2px' }}>
+              {NAV_LABELS[currentPage]?.[lang] || NAV_LABELS.dashboard[lang]}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* Lang toggle */}
             <div style={{ display: 'flex', background: 'var(--gray-100)', borderRadius: 8, padding: 3, gap: 2 }}>
               {(['ar', 'en'] as Lang[]).map(l => (
@@ -174,12 +182,6 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
                 </button>
               ))}
             </div>
-
-            {/* Logout */}
-            <button className="btn" onClick={handleLogout} style={{ fontSize: 13, padding: '6px 12px', gap: 6 }}>
-              <Icon name="logout" size={14} />
-              {t.logout}
-            </button>
           </div>
         </div>
 
