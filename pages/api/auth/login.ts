@@ -5,7 +5,7 @@ import { checkRateLimit } from '../../../lib/rateLimit'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
-  const { username, password } = req.body
+  const { username, password, access_code } = req.body
   if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
     return res.status(400).json({ error: 'Username and password are required' })
   }
@@ -42,12 +42,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (user.status === 'rejected')
     return res.status(403).json({ error: 'Account access denied.' })
 
-  // Fetch bakery name for display
+  // Email verification check (skip for super_admin)
+  if (user.role !== 'super_admin' && user.email_verified === false) {
+    return res.status(403).json({ error: 'يرجى تأكيد بريدك الإلكتروني أولاً — تحقق من صندوق الوارد' })
+  }
+
+  // Fetch bakery info
   let bakery_name = null
+  let bakery_access_code: string | null = null
   if (user.bakery_id) {
     const { data: bakery } = await supabaseAdmin
-      .from('bakeries').select('name').eq('id', user.bakery_id).single()
+      .from('bakeries').select('name, access_code').eq('id', user.bakery_id).single()
     bakery_name = bakery?.name ?? null
+    bakery_access_code = bakery?.access_code ?? null
+  }
+
+  // Access code check (only for non-super-admin bakery accounts that have a code set)
+  if (user.role !== 'super_admin' && bakery_access_code) {
+    if (!access_code) {
+      return res.status(200).json({ needs_code: true })
+    }
+    if (access_code !== bakery_access_code) {
+      return res.status(401).json({ error: 'كود الدخول غير صحيح' })
+    }
   }
 
   const token = signToken({

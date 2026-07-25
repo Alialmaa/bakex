@@ -1,11 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import crypto from 'crypto'
 import { createBakery } from '../../../lib/db/bakeries'
-import { hashPassword, signToken, setAuthCookie } from '../../../lib/auth'
+import { hashPassword } from '../../../lib/auth'
 import { supabaseAdmin } from '../../../lib/supabase'
 import { checkRateLimit } from '../../../lib/rateLimit'
+import { sendVerificationEmail } from '../../../lib/email'
 
-// Server-side form POST handler — sets cookie then redirects directly
-// Avoids any client-side fetch/cookie race conditions
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
 
@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
   const limit = await checkRateLimit(`register:${ip}`)
-  if (!limit.allowed) return res.redirect(302, '/?error=rate_limited')
+  if (!limit.allowed) return res.redirect(302, '/register?error=rate_limited')
 
   try {
     const { data: existing } = await supabaseAdmin
@@ -35,7 +35,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (existing) return res.redirect(302, '/register?error=username_taken')
 
     const bakery = await createBakery(bakery_name)
+    const verificationToken = crypto.randomBytes(32).toString('hex')
     const perms = { dashboard: true, stock: true, produce: true, sales: true, cost: true, reports: true, users: true }
+
     const { data: newUser, error } = await supabaseAdmin.from('users').insert({
       name, username,
       email: email.trim().toLowerCase(),
@@ -45,25 +47,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       perms,
       bakery_id: bakery.id,
       status: 'active',
+      email_verified: false,
+      email_verification_token: verificationToken,
     }).select().single()
 
     if (error || !newUser) return res.redirect(302, '/register?error=create_failed')
 
-    const token = signToken({
-      id: newUser.id,
-      name: newUser.name,
-      username: newUser.username,
-      role: newUser.role,
-      perms: newUser.perms,
-      bakery_id: bakery.id,
-      bakery_name: bakery.name,
-      tv: newUser.token_version ?? 0,
-    })
+    // Send verification email
+    try {
+      const host = req.headers.host ?? 'bakexsystem.com'
+      const protocol = host.includes('localhost') ? 'http' : 'https'
+      const verifyLink = `${protocol}://${host}/api/auth/verify-email?token=${verificationToken}`
+      await sendVerificationEmail(email.trim().toLowerCase(), verifyLink)
+    } catch {
+      // Non-critical — user can request resend later
+    }
 
-    setAuthCookie(res, token)
-    // Server-side redirect — cookie is guaranteed to be set before browser loads /dashboard
-    return res.redirect(302, `/dashboard?new=1&bakery=${encodeURIComponent(bakery.code)}`)
-  } catch (e: any) {
-    return res.redirect(302, '/?error=create_failed')
+    // Redirect to a "check your email" page instead of logging in directly
+    return res.redirect(302, '/register?success=verify_email')
+  } catch {
+    return res.redirect(302, '/register?error=create_failed')
   }
 }
