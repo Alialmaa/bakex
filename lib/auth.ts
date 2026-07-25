@@ -32,7 +32,15 @@ export const setAuthCookie = (res: NextApiResponse, token: string) => {
 }
 
 export const clearAuthCookie = (res: NextApiResponse) => {
-  res.setHeader('Set-Cookie', serialize('bakex_token', '', { maxAge: 0, path: '/' }))
+  // Mirror the attributes the cookie was set with, so browsers reliably match
+  // and drop it rather than leaving the original in place.
+  res.setHeader('Set-Cookie', serialize('bakex_token', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 0,
+    path: '/',
+  }))
 }
 
 export const getUser = (req: NextApiRequest) => {
@@ -101,7 +109,10 @@ async function loadUserState(userId: string): Promise<UserState | null> {
  */
 async function resolveSession(tokenUser: any): Promise<any | null> {
   if (!tokenUser?.id) return null
-  if (tokenUser.tv === undefined) return tokenUser // legacy token, pre-token_version
+  // A token without `tv` predates revocation support and cannot be checked
+  // against anything. Every token issued today carries it, so treat the absence
+  // as invalid rather than as a reason to skip the checks below.
+  if (typeof tokenUser.tv !== 'number') return null
 
   const state = await loadUserState(tokenUser.id)
   if (!state) return null

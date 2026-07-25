@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabase'
 import { sendPasswordResetEmail } from '../../../lib/email'
+import { appUrl } from '../../../lib/appUrl'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -31,9 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (error) return res.status(500).json({ error: 'حدث خطأ، حاول مجدداً' })
 
-  const host = req.headers.host ?? 'bakexsystem.com'
-  const protocol = host.includes('localhost') ? 'http' : 'https'
-  const resetLink = `${protocol}://${host}/reset-password?token=${token}`
+  const resetLink = appUrl(`/reset-password?token=${token}`)
 
   try {
     await sendPasswordResetEmail(normalised, resetLink)

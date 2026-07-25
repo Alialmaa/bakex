@@ -5,6 +5,7 @@ import { hashPassword } from '../../../lib/auth'
 import { supabaseAdmin } from '../../../lib/supabase'
 import { checkRateLimit } from '../../../lib/rateLimit'
 import { sendVerificationEmail } from '../../../lib/email'
+import { appUrl } from '../../../lib/appUrl'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -55,9 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Send verification email
     try {
-      const host = req.headers.host ?? 'bakexsystem.com'
-      const protocol = host.includes('localhost') ? 'http' : 'https'
-      const verifyLink = `${protocol}://${host}/api/auth/verify-email?token=${verificationToken}`
+      const verifyLink = appUrl(`/api/auth/verify-email?token=${verificationToken}`)
       await sendVerificationEmail(email.trim().toLowerCase(), verifyLink)
     } catch {
       // Non-critical — user can request resend later
