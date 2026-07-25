@@ -48,5 +48,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     produced_by: user.id, bakery_id,
   })
 
+  // Add finished goods to stock
+  const { data: existingFinished } = await supabaseAdmin
+    .from('stock')
+    .select('id, qty')
+    .eq('name', recipe.name)
+    .eq('bakery_id', bakery_id)
+    .maybeSingle()
+
+  if (existingFinished) {
+    await supabaseAdmin
+      .from('stock')
+      .update({ qty: (existingFinished.qty || 0) + totalUnits })
+      .eq('id', existingFinished.id)
+  } else {
+    await supabaseAdmin
+      .from('stock')
+      .insert({
+        bakery_id,
+        name: recipe.name,
+        qty: totalUnits,
+        unit: recipe.output_unit || 'حبة',
+      })
+  }
+
   res.status(200).json({ success: true, totalUnits })
 }

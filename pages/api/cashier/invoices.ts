@@ -96,50 +96,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('Sales sync error:', e)
     }
 
-    // 3. Deduct stock based on recipe ingredients
+    // 3. Deduct finished goods from stock (items added to stock during produce step)
     try {
-      // Fetch recipes with their ingredients
-      const recipeIds = items.map((i: any) => i.id)
-      const { data: recipes } = await supabaseAdmin
-        .from('recipes')
-        .select('id, ingredients, units_per_batch, output_qty')
-        .in('id', recipeIds)
-        .eq('bakery_id', bakery_id)
+      for (const item of items) {
+        const { data: stockItem } = await supabaseAdmin
+          .from('stock')
+          .select('id, qty')
+          .eq('name', item.name)
+          .eq('bakery_id', bakery_id)
+          .maybeSingle()
 
-      if (recipes?.length) {
-        for (const item of items) {
-          const recipe = recipes.find((r: any) => r.id === item.id)
-          if (!recipe?.ingredients?.length) continue
-
-          const unitsPerBatch = recipe.units_per_batch || recipe.output_qty || 1
-
-          for (const ing of recipe.ingredients) {
-            if (!ing.material || !ing.amount) continue
-
-            // Amount to deduct = sold_qty * (ingredient_amount / units_per_batch)
-            const deductAmount = item.qty * (ing.amount / unitsPerBatch)
-
-            // Find stock item by name in this bakery
-            let stockQuery = supabaseAdmin
-              .from('stock')
-              .select('id, qty')
-              .eq('name', ing.material)
-            if (bakery_id) stockQuery = stockQuery.eq('bakery_id', bakery_id)
-            const { data: stockItems } = await stockQuery.limit(1)
-
-            if (stockItems?.[0]) {
-              const newQty = Math.max(0, (stockItems[0].qty || 0) - deductAmount)
-              await supabaseAdmin
-                .from('stock')
-                .update({ qty: newQty })
-                .eq('id', stockItems[0].id)
-                .eq('bakery_id', bakery_id)
-            }
-          }
+        if (stockItem) {
+          await supabaseAdmin
+            .from('stock')
+            .update({ qty: Math.max(0, (stockItem.qty || 0) - item.qty) })
+            .eq('id', stockItem.id)
         }
       }
     } catch (e) {
-      // Stock deduction failed — non-critical, continue
       console.error('Stock deduction error:', e)
     }
 
