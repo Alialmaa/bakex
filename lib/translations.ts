@@ -11,7 +11,7 @@ export const T = {
     stock: { title: 'المخزون', material: 'المادة', qty: 'الكمية', unit: 'الوحدة', min: 'الحد الأدنى', price: 'سعر الوحدة', status: 'الحالة', ok: 'كافٍ', low: 'ناقص', empty: 'نفذ', add: 'إضافة مادة', packType: 'نوع العبوة', packQty: 'عدد العبوات', packContent: 'محتوى العبوة', packPrice: 'سعر العبوة' },
     produce: { title: 'الإنتاج', produces: 'ينتج', produceNow: 'أنتج الآن', insufficient: 'مواد غير كافية', todayLog: 'سجل الإنتاج اليوم', noProduction: 'لا يوجد إنتاج بعد', unitCost: 'كوست الحبة' },
     sales: { title: 'المبيعات', recordToday: 'سجّل مبيعات اليوم', confirm: 'تأكيد المبيعات', log: 'سجل المبيعات', noSales: 'لا توجد مبيعات' },
-    cost: { title: 'حاسبة الكوست', ingredients: 'المكونات', unitCost: 'تكلفة الحبة', sellPrice: 'سعر البيع', profit: 'ربح الحبة', margin: 'هامش الربح', breakeven: 'نقطة التعادل', suggested: 'سعر مقترح (30%)' },
+    cost: { title: 'حاسبة الكوست', ingredients: 'المكونات', unitCost: 'تكلفة الحبة', sellPrice: 'سعر البيع', profit: 'ربح الحبة', margin: 'هامش الربح', breakeven: 'نقطة التعادل', suggested: 'سعر مقترح ⁦(30%)⁩' },
     reports: { title: 'التقارير', totalRev: 'إجمالي الإيراد', totalCost: 'إجمالي التكلفة', netProfit: 'صافي الربح', netLoss: 'صافي الخسارة', avgMargin: 'متوسط الهامش', topProducts: 'أعلى ربحاً', botProducts: 'أدنى ربحاً' },
     dashboard: { title: 'لوحة التحكم', todaySales: 'مبيعات اليوم', monthRev: 'إيراد الشهر', monthProfit: 'ربح الشهر', lowStock: 'مواد ناقصة', alerts: 'التنبيهات', recentOps: 'آخر العمليات', perf: 'أداء المنتجات' },
     users: { title: 'إدارة الحسابات', permissions: 'الصلاحيات', role: 'الدور الوظيفي', noAccess: 'غير متاح', myPerms: 'صلاحياتك' },

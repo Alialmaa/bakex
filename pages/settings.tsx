@@ -27,7 +27,7 @@ export default function SettingsPage({ user }: any) {
   const handleChangePassword = async () => {
     setPwError('')
     if (!pwForm.current || !pwForm.next || !pwForm.confirm) { setPwError('يرجى تعبئة جميع الحقول'); return }
-    if (pwForm.next.length < 6) { setPwError('كلمة المرور الجديدة يجب أن تكون ٦ أحرف على الأقل'); return }
+    if (pwForm.next.length < 6) { setPwError('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل'); return }
     if (pwForm.next !== pwForm.confirm) { setPwError('كلمة المرور الجديدة وتأكيدها غير متطابقتين'); return }
     setPwSaving(true)
     try {
@@ -95,7 +95,7 @@ export default function SettingsPage({ user }: any) {
 
         {/* Company Info */}
         <div className="card">
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="card-title" style={{ marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a679" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             بيانات المنشأة
           </div>
@@ -133,7 +133,7 @@ export default function SettingsPage({ user }: any) {
 
         {/* VAT / ZATCA */}
         <div className="card">
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 6, paddingBottom: 12, borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="card-title" style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
             بيانات الضريبة — ZATCA
           </div>
@@ -171,18 +171,18 @@ export default function SettingsPage({ user }: any) {
 
         {/* VAT Rate */}
         <div className="card">
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="card-title" style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
             نسبة ضريبة القيمة المضافة
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 28, fontWeight: 900, color: '#92400e' }}>١٥٪</span>
-              <span style={{ fontSize: 12, color: '#b45309' }}>ضريبة القيمة المضافة<br/>المعدل المعتمد في السعودية</span>
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className="num" style={{ fontSize: 28, fontWeight: 800, color: '#92400e', letterSpacing: '-1px' }}>15%</span>
+              <span style={{ fontSize: 12, color: '#b45309', fontWeight: 500 }}>ضريبة القيمة المضافة<br/>المعدل المعتمد في السعودية</span>
             </div>
             <div style={{ fontSize: 12.5, color: '#64748b', lineHeight: 1.7 }}>
               يتم إضافة الضريبة تلقائياً على كل فاتورة.<br />
-              السعر المدخل + ١٥٪ = الإجمالي للعميل.
+              السعر المدخل + 15% = الإجمالي للعميل.
             </div>
           </div>
         </div>
@@ -193,7 +193,7 @@ export default function SettingsPage({ user }: any) {
 
         {/* Change Password */}
         <div className="card">
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="card-title" style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
             تغيير كلمة المرور
           </div>
@@ -219,7 +219,7 @@ export default function SettingsPage({ user }: any) {
             </div>
             <div>
               <label style={{ fontSize: 12.5, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>كلمة المرور الجديدة</label>
-              <input type="password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} placeholder="٦ أحرف على الأقل" dir="ltr" />
+              <input type="password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} placeholder="6 أحرف على الأقل" dir="ltr" />
             </div>
             <div>
               <label style={{ fontSize: 12.5, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>تأكيد كلمة المرور الجديدة</label>

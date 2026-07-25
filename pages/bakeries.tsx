@@ -4,6 +4,7 @@ import { getUser } from '../lib/auth'
 import { listBakeries, getBakeryUserCount } from '../lib/db/bakeries'
 import Layout from '../components/Layout'
 import { useLang } from '../lib/useLang'
+import { fmtDate } from '../lib/datetime'
 
 const GREEN = '#16a679'
 
@@ -268,7 +269,7 @@ export default function BakeriesPage({ user, bakeries: initial }: { user: any; b
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', color: '#555' }}>{b.user_count}</td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', color: '#888' }}>
-                        {new Date(b.created_at).toLocaleDateString('ar-SA')}
+                        {fmtDate(b.created_at, 'ar')}
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <StatusBadge bakery={b} />

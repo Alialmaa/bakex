@@ -3,8 +3,12 @@ import type { GetServerSideProps } from 'next'
 import { getUser } from '../lib/auth'
 import { supabaseAdmin } from '../lib/supabase'
 import Layout from '../components/Layout'
+import { MetricCard, Icons } from '../components/Metric'
 import { T } from '../lib/translations'
 import { useLang } from '../lib/useLang'
+import { fmtTime } from '../lib/datetime'
+
+const COLS = '26px 1.5fr 80px 80px 70px 80px 80px'
 
 export default function ReportsPage({ user, initialData, initialTotals, initialProdSummary }: any) {
   const { lang, setLang } = useLang()
@@ -50,44 +54,64 @@ export default function ReportsPage({ user, initialData, initialTotals, initialP
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
         {/* Header with refresh */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 12, color: '#888' }}>
-            🔄 {lang === 'ar' ? 'آخر تحديث:' : 'Last update:'} {lastUpdated.toLocaleTimeString(lang === 'ar' ? 'ar' : 'en', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-            <span style={{ marginRight: 8, marginLeft: 8, color: '#ccc' }}>|</span>
+        <div className="page-head">
+          <div className="page-head-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 0 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a679', flexShrink: 0 }} />
+            <span suppressHydrationWarning>
+              {lang === 'ar' ? 'آخر تحديث:' : 'Last update:'} {fmtTime(lastUpdated, lang, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+            <span style={{ color: '#e5e7eb' }}>|</span>
             {lang === 'ar' ? 'يتحدث تلقائياً كل 30 ثانية' : 'Auto-refreshes every 30s'}
           </div>
-          <button onClick={fetchData} disabled={refreshing} className="btn" style={{ fontSize: 12, padding: '5px 12px' }}>
+          <button onClick={fetchData} disabled={refreshing} className="btn" style={{ fontSize: 12.5, padding: '6px 14px' }}>
             {refreshing ? '...' : (lang === 'ar' ? '↻ تحديث الآن' : '↻ Refresh')}
           </button>
         </div>
 
         {/* Metrics */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
-          <div className="metric"><div className="metric-label">{t.reports.totalRev}</div><div className="metric-value">{totals.revenue.toFixed(0)} <span style={{ fontSize: 12, fontWeight: 400 }}>{cur}</span></div></div>
-          <div className="metric"><div className="metric-label">{t.reports.totalCost}</div><div className="metric-value" style={{ color: '#A32D2D' }}>{totals.cost.toFixed(0)} <span style={{ fontSize: 12, fontWeight: 400 }}>{cur}</span></div></div>
-          <div style={{ background: totals.profit >= 0 ? '#E1F5EE' : '#FCEBEB', borderRadius: 8, padding: '12px 14px' }}>
-            <div className="metric-label" style={{ color: totals.profit >= 0 ? '#0F6E56' : '#A32D2D' }}>{totals.profit >= 0 ? t.reports.netProfit : t.reports.netLoss}</div>
-            <div className="metric-value" style={{ color: totals.profit >= 0 ? '#085041' : '#A32D2D' }}>{totals.profit >= 0 ? '+' : ''}{totals.profit.toFixed(0)} <span style={{ fontSize: 12, fontWeight: 400 }}>{cur}</span></div>
-          </div>
-          <div className="metric"><div className="metric-label">{t.reports.avgMargin}</div><div className="metric-value" style={{ color: totals.avgMargin < 15 ? '#854F0B' : '#3B6D11' }}>{totals.avgMargin.toFixed(1)}<span style={{ fontSize: 12, fontWeight: 400 }}>%</span></div></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <MetricCard
+            label={t.reports.totalRev} value={totals.revenue.toFixed(0)} unit={cur}
+            sub={lang === 'ar' ? 'إيراد هذا الشهر' : 'revenue this month'}
+            icon={Icons.trendUp} tone="green"
+          />
+          <MetricCard
+            label={t.reports.totalCost} value={totals.cost.toFixed(0)} unit={cur}
+            sub={lang === 'ar' ? 'كوست المنتجات المباعة' : 'cost of goods sold'}
+            icon={Icons.trendDown} tone="red" valueColor="#dc2626"
+          />
+          <MetricCard
+            label={totals.profit >= 0 ? t.reports.netProfit : t.reports.netLoss}
+            value={`${totals.profit >= 0 ? '+' : ''}${totals.profit.toFixed(0)}`} unit={cur}
+            sub={lang === 'ar' ? 'الإيراد ناقص الكوست' : 'revenue minus cost'}
+            icon={Icons.wallet} tone={totals.profit >= 0 ? 'green' : 'red'}
+            valueColor={totals.profit >= 0 ? '#059669' : '#dc2626'}
+          />
+          <MetricCard
+            label={t.reports.avgMargin} value={totals.avgMargin.toFixed(1)} unit="%"
+            sub={lang === 'ar' ? 'متوسط هامش الربح' : 'average profit margin'}
+            icon={Icons.percent} tone={totals.avgMargin < 15 ? 'amber' : 'green'}
+            valueColor={totals.avgMargin < 0 ? '#dc2626' : totals.avgMargin < 15 ? '#d97706' : '#059669'}
+          />
         </div>
 
         {/* Production summary */}
         <div className="card">
-          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 10 }}>
-            🏭 {lang === 'ar' ? 'ملخص الإنتاج هذا الشهر' : 'Production this Month'}
+          <div className="card-title" style={{ marginBottom: 14 }}>
+            <span className="ico-md" style={{ color: '#7c3aed' }}>{Icons.factory}</span>
+            {lang === 'ar' ? 'ملخص الإنتاج هذا الشهر' : 'Production this Month'}
           </div>
           {prodSummary.length === 0 ? (
-            <div style={{ color: '#888', fontSize: 13, textAlign: 'center', padding: '12px 0' }}>
+            <div className="tbl-empty" style={{ padding: '18px 0' }}>
               {lang === 'ar' ? 'لا يوجد إنتاج هذا الشهر' : 'No production this month'}
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
               {prodSummary.map((p: any, i: number) => (
-                <div key={i} style={{ background: '#f5f5f3', padding: '10px 12px', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: '#888', marginBottom: 3 }}>{p.recipe_name}</div>
-                  <div style={{ fontSize: 18, fontWeight: 500 }}>{p.total} <span style={{ fontSize: 11, color: '#888' }}>{p.output_unit}</span></div>
-                  <div style={{ fontSize: 10, color: '#3B6D11', marginTop: 2 }}>{lang === 'ar' ? 'كوست:' : 'Cost:'} {(p.totalCost || 0).toFixed(1)} {cur}</div>
+                <div key={i} style={{ background: '#f9fafb', border: '1px solid #f1f5f9', padding: '12px 14px', borderRadius: 10 }}>
+                  <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 5, fontWeight: 500 }}>{p.recipe_name}</div>
+                  <div className="num" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>{p.total} <span style={{ fontSize: 11.5, color: '#9ca3af', fontWeight: 500 }}>{p.output_unit}</span></div>
+                  <div className="num" style={{ fontSize: 11, color: '#059669', marginTop: 4, fontWeight: 500 }}>{lang === 'ar' ? 'كوست:' : 'Cost:'} {(p.totalCost || 0).toFixed(1)} {cur}</div>
                 </div>
               ))}
             </div>
@@ -95,61 +119,69 @@ export default function ReportsPage({ user, initialData, initialTotals, initialP
         </div>
 
         {/* Products table */}
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>{lang === 'ar' ? 'تفصيل المنتجات' : 'Product Breakdown'}</span>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 18px 14px', flexWrap: 'wrap', gap: 8 }}>
+            <span className="card-title">{lang === 'ar' ? 'تفصيل المنتجات' : 'Product Breakdown'}</span>
             <div style={{ display: 'flex', gap: 5 }}>
               {(['profit', 'margin', 'cost'] as const).map(s => (
-                <button key={s} onClick={() => setSort(s)} className={`tag ${s === 'profit' ? 'tag-green' : s === 'margin' ? 'tag-yellow' : 'tag-red'}`} style={{ cursor: 'pointer', border: sort === s ? '1.5px solid #1D9E75' : '1.5px solid transparent', padding: '3px 10px' }}>
+                <button key={s} onClick={() => setSort(s)} className={`tag ${s === 'profit' ? 'tag-green' : s === 'margin' ? 'tag-yellow' : 'tag-red'}`} style={{ cursor: 'pointer', border: sort === s ? '1.5px solid #16a679' : '1.5px solid transparent', padding: '3px 11px', fontWeight: 600 }}>
                   {s === 'profit' ? (lang === 'ar' ? 'ربح' : 'Profit') : s === 'margin' ? (lang === 'ar' ? 'هامش' : 'Margin') : (lang === 'ar' ? 'كوست' : 'Cost')}
                 </button>
               ))}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 80px 80px 70px 80px 80px', gap: 8, padding: '6px 0 8px', borderBottom: '0.5px solid #d4d4d4', fontSize: 11, color: '#888', fontWeight: 500 }}>
-            <span>#</span><span>{lang === 'ar' ? 'المنتج' : 'Product'}</span><span>{lang === 'ar' ? 'الكوست' : 'Cost'}</span><span>{lang === 'ar' ? 'السعر' : 'Price'}</span><span>{lang === 'ar' ? 'مباع' : 'Sold'}</span><span>{lang === 'ar' ? 'الإيراد' : 'Revenue'}</span><span>{lang === 'ar' ? 'الربح' : 'Profit'}</span>
-          </div>
-
-          {sorted.length === 0 ? (
-            <div style={{ padding: '20px 0', textAlign: 'center', color: '#888', fontSize: 13 }}>
-              {lang === 'ar' ? 'لا توجد بيانات مبيعات هذا الشهر' : 'No sales data this month'}
-            </div>
-          ) : sorted.map((d: any, i: number) => {
-            const pc = d.profit < 0 ? '#A32D2D' : d.profit === 0 ? '#888' : '#3B6D11'
-            const mc = d.margin === null ? null : d.margin < 0 ? 'tag-red' : d.margin < 15 ? 'tag-yellow' : 'tag-green'
-            return (
-              <div key={d.name} style={{ display: 'grid', gridTemplateColumns: '22px 1.5fr 80px 80px 70px 80px 80px', gap: 8, alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
-                <span style={{ color: '#888', fontSize: 12 }}>{i + 1}</span>
-                <span style={{ fontWeight: 500 }}>{d.name}{mc && <span className={`tag ${mc}`} style={{ fontSize: 10, marginRight: 6, marginLeft: 6 }}>{d.margin?.toFixed(0)}%</span>}</span>
-                <span style={{ fontSize: 12 }}>{d.unitCost.toFixed(3)}</span>
-                <span style={{ fontSize: 12 }}>{d.sellPrice > 0 ? d.sellPrice.toFixed(2) : '—'}</span>
-                <span style={{ fontSize: 12 }}>{d.qty}</span>
-                <span style={{ fontSize: 12 }}>{d.revenue.toFixed(0)}</span>
-                <span style={{ fontSize: 12, fontWeight: 500, color: pc }}>{d.profit >= 0 ? '+' : ''}{d.profit.toFixed(0)}</span>
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ minWidth: 620 }}>
+              <div className="thead" style={{ gridTemplateColumns: COLS, gap: 8, borderTop: '1px solid #e5e7eb' }}>
+                <span>#</span><span>{lang === 'ar' ? 'المنتج' : 'Product'}</span><span>{lang === 'ar' ? 'الكوست' : 'Cost'}</span><span>{lang === 'ar' ? 'السعر' : 'Price'}</span><span>{lang === 'ar' ? 'مباع' : 'Sold'}</span><span>{lang === 'ar' ? 'الإيراد' : 'Revenue'}</span><span>{lang === 'ar' ? 'الربح' : 'Profit'}</span>
               </div>
-            )
-          })}
+
+              {sorted.length === 0 ? (
+                <div className="tbl-empty">
+                  {lang === 'ar' ? 'لا توجد بيانات مبيعات هذا الشهر' : 'No sales data this month'}
+                </div>
+              ) : sorted.map((d: any, i: number) => {
+                const pc = d.profit < 0 ? '#dc2626' : d.profit === 0 ? '#9ca3af' : '#059669'
+                const mc = d.margin === null ? null : d.margin < 0 ? 'tag-red' : d.margin < 15 ? 'tag-yellow' : 'tag-green'
+                return (
+                  <div key={d.name} className="trow" style={{ gridTemplateColumns: COLS, gap: 8 }}>
+                    <span className="num" style={{ color: '#9ca3af', fontSize: 12, fontWeight: 600 }}>{i + 1}</span>
+                    <span style={{ fontWeight: 600, minWidth: 0 }}>{d.name}{mc && <span className={`tag ${mc}`} style={{ fontSize: 10, marginInlineStart: 6 }}>{d.margin?.toFixed(0)}%</span>}</span>
+                    <span className="num" style={{ fontSize: 12.5, color: '#6b7280' }}>{d.unitCost.toFixed(3)}</span>
+                    <span className="num" style={{ fontSize: 12.5 }}>{d.sellPrice > 0 ? d.sellPrice.toFixed(2) : '—'}</span>
+                    <span className="num" style={{ fontSize: 12.5 }}>{d.qty}</span>
+                    <span className="num" style={{ fontSize: 12.5 }}>{d.revenue.toFixed(0)}</span>
+                    <span className="num" style={{ fontSize: 12.5, fontWeight: 700, color: pc }}>{d.profit >= 0 ? '+' : ''}{d.profit.toFixed(0)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Top/Bot */}
         {sorted.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {[
-              { title: t.reports.topProducts, icon: '🏆', list: [...sorted].slice(0, 3), isTop: true },
-              { title: t.reports.botProducts, icon: '📉', list: [...sorted].reverse().slice(0, 3), isTop: false }
-            ].map(({ title, icon, list, isTop }) => (
+              { title: t.reports.topProducts, icon: Icons.trendUp, tint: '#059669', list: [...sorted].slice(0, 3), isTop: true },
+              { title: t.reports.botProducts, icon: Icons.trendDown, tint: '#d97706', list: [...sorted].reverse().slice(0, 3), isTop: false }
+            ].map(({ title, icon, tint, list, isTop }) => (
               <div key={title} className="card">
-                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>{icon} {title}</div>
+                <div className="card-title" style={{ marginBottom: 14 }}>
+                  <span className="ico-md" style={{ color: tint }}>{icon}</span>{title}
+                </div>
                 {list.map((d: any, i: number) => {
                   const pct = Math.round(Math.abs(d.profit) / maxProfit * 100)
-                  const c = d.profit < 0 ? '#E24B4A' : isTop ? '#1D9E75' : '#EF9F27'
-                  const pc = d.profit < 0 ? '#A32D2D' : isTop ? '#3B6D11' : '#854F0B'
+                  const c = d.profit < 0 ? '#ef4444' : isTop ? '#16a679' : '#f59e0b'
+                  const pc = d.profit < 0 ? '#dc2626' : isTop ? '#059669' : '#d97706'
                   return (
-                    <div key={d.name} style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ color: '#aaa', fontSize: 11 }}>{i + 1}</span>{d.name}</span>
-                        <span style={{ fontWeight: 500, color: pc }}>{d.profit >= 0 ? '+' : ''}{d.profit.toFixed(0)} {cur}</span>
+                    <div key={d.name} style={{ marginBottom: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6, gap: 8 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, fontWeight: 500 }}>
+                          <span className="num" style={{ color: '#d1d5db', fontSize: 11, fontWeight: 700 }}>{i + 1}</span>{d.name}
+                        </span>
+                        <span className="num" style={{ fontWeight: 700, color: pc, whiteSpace: 'nowrap' }}>{d.profit >= 0 ? '+' : ''}{d.profit.toFixed(0)} {cur}</span>
                       </div>
                       <div className="bar-wrap"><div className="bar-fill" style={{ width: `${pct}%`, background: c }} /></div>
                     </div>

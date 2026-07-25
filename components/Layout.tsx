@@ -190,14 +190,20 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
           <div style={{ background: bannerBg, borderBottom: `1px solid ${bannerBorder}`, padding: '9px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <span style={{ fontSize: 13, color: bannerColor, fontWeight: 500 }}>
               {isExpired
-                ? 'انتهت فترة التجربة المجانية — يرجى الاشتراك للاستمرار'
-                : `تبقّى ${daysLeft} ${daysLeft === 1 ? 'يوم' : 'أيام'} من التجربة المجانية`
+                ? (isRTL
+                    ? 'انتهت فترة التجربة المجانية — يرجى الاشتراك للاستمرار'
+                    : 'Your free trial has ended — subscribe to continue')
+                : (isRTL
+                    ? `تبقّى ${daysLeft} ${daysLeft === 1 ? 'يوم' : 'أيام'} من التجربة المجانية`
+                    : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left in your free trial`)
               }
             </span>
             <button
               onClick={() => router.push('/billing')}
               style={{ background: isExpired ? '#dc2626' : '#16a679', color: '#fff', border: 'none', borderRadius: 7, padding: '5px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-              {isExpired ? 'اشترك الآن' : 'عرض الباقات'}
+              {isExpired
+                ? (isRTL ? 'اشترك الآن' : 'Subscribe now')
+                : (isRTL ? 'عرض الباقات' : 'View plans')}
             </button>
           </div>
         )}

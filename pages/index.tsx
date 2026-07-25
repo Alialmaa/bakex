@@ -1,5 +1,6 @@
 import { useRouter } from 'next/router'
 import { useState } from 'react'
+import { fmtDateLong } from '../lib/datetime'
 
 const G = '#16a679'
 const GD = '#0d7a5a'
@@ -10,7 +11,7 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
   return (
-    <div dir="rtl" style={{ fontFamily: "'Inter', -apple-system, sans-serif", color: DARK, background: '#fff', overflowX: 'hidden' }}>
+    <div dir="rtl" style={{ fontFamily: 'var(--font-ui)', color: DARK, background: '#fff', overflowX: 'hidden' }}>
 
       {/* ── NAV ── */}
       <nav style={{
@@ -122,7 +123,7 @@ export default function Landing() {
             {/* Mock topbar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>لوحة التحكم — اليوم</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }} suppressHydrationWarning>{new Date().toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }} suppressHydrationWarning>{fmtDateLong(new Date(), 'ar')}</div>
             </div>
             {/* KPI Row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>

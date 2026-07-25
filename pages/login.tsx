@@ -74,7 +74,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div dir={isAR ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', display: 'flex', fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    <div dir={isAR ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', display: 'flex', fontFamily: 'var(--font-ui)' }}>
 
       {/* ── LEFT: Dark panel ── */}
       <div style={{

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
+import { fmtDate } from '../lib/datetime'
 
 const GREEN = '#16a679'
 const PRICE = '2,500'
@@ -32,7 +33,7 @@ export default function BillingPage() {
   const urgency = daysLeft <= 3 ? '#dc2626' : daysLeft <= 7 ? '#d97706' : GREEN
 
   return (
-    <div dir="rtl" style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    <div dir="rtl" style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'var(--font-ui)' }}>
 
       {/* Top bar */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -70,7 +71,7 @@ export default function BillingPage() {
                 </div>
                 <div style={{ fontSize: 13, color: isExpired ? '#dc2626' : '#64748b', marginTop: 2 }}>
                   {isActive && billing.subscriptionEndsAt
-                    ? `ينتهي الاشتراك في ${new Date(billing.subscriptionEndsAt).toLocaleDateString('ar-SA')}`
+                    ? `ينتهي الاشتراك في ${fmtDate(billing.subscriptionEndsAt, 'ar')}`
                     : isExpired
                     ? 'لا يمكنك الوصول للنظام حتى يتم الاشتراك'
                     : `تبقّى ${daysLeft} ${daysLeft === 1 ? 'يوم' : 'أيام'} من التجربة المجانية`

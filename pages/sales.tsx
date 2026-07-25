@@ -3,8 +3,10 @@ import type { GetServerSideProps } from 'next'
 import { getUser } from '../lib/auth'
 import { supabaseAdmin } from '../lib/supabase'
 import Layout from '../components/Layout'
+import { MetricCard, Icons, TrashIcon } from '../components/Metric'
 import { T } from '../lib/translations'
 import { useLang } from '../lib/useLang'
+import { fmtDate, fmtTime } from '../lib/datetime'
 
 export default function SalesPage({ user, initialRecipes, initialSales }: any) {
   const { lang, setLang } = useLang()
@@ -51,18 +53,33 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
   return (
     <Layout user={user} lang={lang} setLang={setLang}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-          <div className="metric"><div className="metric-label">{lang === 'ar' ? 'مبيعات اليوم' : "Today's Sales"}</div><div className="metric-value">{todayRev.toFixed(0)} <span style={{ fontSize: 12, fontWeight: 400 }}>{t.currency}</span></div></div>
-          <div className="metric"><div className="metric-label">{lang === 'ar' ? 'الفواتير' : 'Transactions'}</div><div className="metric-value">{sales.length}</div></div>
-          <div className="metric"><div className="metric-label">{lang === 'ar' ? 'المنتجات' : 'Products'}</div><div className="metric-value">{recipes.length}</div></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+          <MetricCard
+            label={lang === 'ar' ? 'مبيعات اليوم' : "Today's Sales"}
+            value={todayRev.toFixed(0)} unit={t.currency}
+            sub={lang === 'ar' ? 'إيراد اليوم الحالي' : 'revenue so far today'}
+            icon={Icons.cart} tone="green"
+          />
+          <MetricCard
+            label={lang === 'ar' ? 'الفواتير' : 'Transactions'}
+            value={sales.length}
+            sub={lang === 'ar' ? 'آخر 50 عملية' : 'last 50 entries'}
+            icon={Icons.receipt} tone="blue"
+          />
+          <MetricCard
+            label={lang === 'ar' ? 'المنتجات' : 'Products'}
+            value={recipes.length}
+            sub={lang === 'ar' ? 'منتج متاح للبيع' : 'available to sell'}
+            icon={Icons.tag} tone="violet"
+          />
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>{t.sales.recordToday}</div>
+          <div className="card-title" style={{ marginBottom: 14 }}>{t.sales.recordToday}</div>
 
           {/* Date selector */}
           <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 12, color: '#666', fontWeight: 500 }}>{lang === 'ar' ? 'تاريخ المبيعات:' : 'Sale date:'}</div>
+            <div style={{ fontSize: 12.5, color: '#6b7280', fontWeight: 500 }}>{lang === 'ar' ? 'تاريخ المبيعات:' : 'Sale date:'}</div>
             <input
               type="date"
               value={saleDate}
@@ -74,17 +91,17 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
               <span className="tag tag-yellow">{lang === 'ar' ? 'تاريخ سابق' : 'Past date'}</span>
             )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 90px', gap: 8, padding: '4px 0 8px', borderBottom: '0.5px solid #d4d4d4', fontSize: 11, color: '#888', fontWeight: 500 }}>
+          <div className="thead" style={{ gridTemplateColumns: '1fr 110px 110px 90px', gap: 8, margin: '0 -18px', paddingInline: 18, background: 'transparent' }}>
             <span>{lang === 'ar' ? 'المنتج' : 'Product'}</span>
             <span>{lang === 'ar' ? 'الوحدة' : 'Unit'}</span>
             <span>{lang === 'ar' ? 'سعر البيع' : 'Sell Price'}</span>
             <span>{lang === 'ar' ? 'الكمية' : 'Qty'}</span>
           </div>
           {recipes.map(r => (
-            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 90px', gap: 8, padding: '10px 0', borderBottom: '0.5px solid #e5e5e5', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 500 }}>{r.name}</span>
-              <span style={{ fontSize: 12, color: '#888' }}>{r.output_unit}</span>
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#1D9E75' }}>{(r.sell_price || 0).toFixed(2)} {t.currency}</span>
+            <div key={r.id} className="trow" style={{ gridTemplateColumns: '1fr 110px 110px 90px', gap: 8, margin: '0 -18px', paddingInline: 18 }}>
+              <span style={{ fontWeight: 600 }}>{r.name}</span>
+              <span style={{ fontSize: 12.5, color: '#9ca3af' }}>{r.output_unit}</span>
+              <span className="num" style={{ fontWeight: 600, color: '#059669' }}>{(r.sell_price || 0).toFixed(2)} {t.currency}</span>
               <input
                 type="number"
                 value={qtys[r.id] ?? ''}
@@ -110,21 +127,21 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 10 }}>{t.sales.log}</div>
-          {sales.length === 0 ? <div style={{ color: '#888', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>{t.sales.noSales}</div>
+          <div className="card-title" style={{ marginBottom: 12 }}>{t.sales.log}</div>
+          {sales.length === 0 ? <div className="tbl-empty">{t.sales.noSales}</div>
             : sales.slice(0, 50).map((s, i) => (
-              <div key={s.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
-                <span>{s.recipe_name} × {s.qty}</span>
+              <div key={s.id || i} className="trow" style={{ gridTemplateColumns: '1fr auto', gap: 10, margin: '0 -18px', paddingInline: 18 }}>
+                <span style={{ fontWeight: 500 }}>{s.recipe_name} <span style={{ color: '#9ca3af' }}>× {s.qty}</span></span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 500 }}>{s.total?.toFixed(2)} {t.currency}</div>
-                    <div style={{ fontSize: 11, color: '#888' }}>{new Date(s.created_at).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en')} {new Date(s.created_at).toLocaleTimeString(lang === 'ar' ? 'ar' : 'en', { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div style={{ textAlign: lang === 'ar' ? 'left' : 'right' }}>
+                    <div className="num" style={{ fontWeight: 600 }}>{s.total?.toFixed(2)} {t.currency}</div>
+                    <div className="num" style={{ fontSize: 11, color: '#9ca3af' }} suppressHydrationWarning>{fmtDate(s.created_at, lang)} · {fmtTime(s.created_at, lang)}</div>
                   </div>
-                  <button onClick={async () => {
+                  <button className="ibtn ibtn-del" title={lang === 'ar' ? 'حذف' : 'Delete'} onClick={async () => {
                     if (!confirm(lang === 'ar' ? 'حذف هذه المبيعة؟' : 'Delete this sale?')) return
                     const res = await fetch('/api/sales', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) })
                     if (res.ok) setSales(sales.filter(x => x.id !== s.id))
-                  }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E24B4A', fontSize: 14, padding: 4 }}>🗑</button>
+                  }}><TrashIcon /></button>
                 </div>
               </div>
             ))}
