@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import Layout from '../components/Layout'
 import { useLang } from '../lib/useLang'
 
@@ -238,7 +238,8 @@ export default function SettingsPage({ user }: any) {
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
+  const guard = await requirePage(req as any, { skipSubscription: true })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
   return { props: { user } }
 }

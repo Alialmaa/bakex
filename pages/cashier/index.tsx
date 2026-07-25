@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../../lib/auth'
+import { requirePage, isRedirect } from '../../lib/auth'
 import { supabaseAdmin } from '../../lib/supabase'
 import { fmtDate, fmtTime } from '../../lib/datetime'
 
@@ -562,8 +562,9 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/cashier/login', permanent: false } }
+  const guard = await requirePage(req as any, { loginTo: '/cashier/login' })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
 
   const bid = user.bakery_id
   const { data: products } = bid

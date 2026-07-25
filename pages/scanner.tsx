@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import Layout from '../components/Layout'
 import { T } from '../lib/translations'
 import { useLang } from '../lib/useLang'
@@ -369,9 +369,9 @@ export default function ScannerPage({ user, allStock, allRecipes }: any) {
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.stock && !user.perms?.produce) return { redirect: { destination: '/403', permanent: false } }
+  const guard = await requirePage(req as any, { anyPerm: ['stock', 'produce'] })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
 
   const { supabaseAdmin } = await import('../lib/supabase')
   const bid = user.bakery_id

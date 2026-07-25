@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../../lib/auth'
+import { hasValidSession } from '../../lib/auth'
 
 const PURPLE = '#6C63FF'
 
@@ -85,7 +85,7 @@ export default function CashierLoginPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (user) return { redirect: { destination: '/cashier', permanent: false } }
+  if (await hasValidSession(req as any))
+    return { redirect: { destination: '/cashier', permanent: false } }
   return { props: {} }
 }

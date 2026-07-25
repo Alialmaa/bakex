@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import { supabaseAdmin } from '../lib/supabase'
 import Layout from '../components/Layout'
 import { MetricCard, Icons, EditIcon, TrashIcon } from '../components/Metric'
@@ -218,9 +218,9 @@ export default function UsersPage({ user, initialUsers }: any) {
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.users) return { redirect: { destination: '/403', permanent: false } }
+  const guard = await requirePage(req as any, { anyPerm: ['users'] })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
   const bid = user.bakery_id
   const { data } = bid
     ? await supabaseAdmin.from('users').select('id,name,username,role,perms,status,created_at').eq('bakery_id', bid).order('created_at')

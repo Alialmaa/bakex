@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import Layout from '../components/Layout'
 import { MetricCard, Icons } from '../components/Metric'
 import { T } from '../lib/translations'
@@ -246,10 +246,9 @@ export default function Dashboard({ user, stats, alerts, recentLog, pendingCount
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (user.role === 'super_admin') return { redirect: { destination: '/bakeries', permanent: false } }
-  if (!user.perms?.dashboard) return { redirect: { destination: '/cashier', permanent: false } }
+  const guard = await requirePage(req as any, { anyPerm: ['dashboard'], denyTo: '/cashier', redirectSuperAdminTo: '/bakeries' })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
 
   const bakery_id = user.bakery_id
   const today = new Date().toISOString().split('T')[0]

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { hasValidSession } from '../lib/auth'
 
 const GREEN = '#16a679'
 
@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (user) return { redirect: { destination: '/dashboard', permanent: false } }
+  if (await hasValidSession(req as any))
+    return { redirect: { destination: '/dashboard', permanent: false } }
   return { props: {} }
 }

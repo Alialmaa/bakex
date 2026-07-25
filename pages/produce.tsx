@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import { supabaseAdmin } from '../lib/supabase'
 import Layout from '../components/Layout'
 import { MetricCard, Icons, EditIcon, TrashIcon } from '../components/Metric'
@@ -391,9 +391,9 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.produce) return { redirect: { destination: '/403', permanent: false } }
+  const guard = await requirePage(req as any, { anyPerm: ['produce'] })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
 
   const today = new Date().toISOString().split('T')[0]
   const monthStart = new Date().toISOString().slice(0, 7) + '-01'

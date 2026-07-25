@@ -1,6 +1,6 @@
 import type { GetServerSideProps } from 'next'
 import { useState } from 'react'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import { listBakeries, getBakeryUserCount } from '../lib/db/bakeries'
 import Layout from '../components/Layout'
 import { useLang } from '../lib/useLang'
@@ -360,9 +360,9 @@ export default function BakeriesPage({ user, bakeries: initial }: { user: any; b
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (user.role !== 'super_admin') return { redirect: { destination: '/', permanent: false } }
+  const guard = await requirePage(req as any, { superAdminOnly: true })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
 
   const rows = await listBakeries()
   const bakeries = await Promise.all(

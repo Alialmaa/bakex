@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '../../../lib/supabase'
-import { hashPassword } from '../../../lib/auth'
+import { hashPassword, invalidateUserCache } from '../../../lib/auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -33,6 +33,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .eq('id', user.id)
 
   if (error) return res.status(500).json({ error: 'حدث خطأ، حاول مجدداً' })
+
+  // Sessions are cached briefly; drop this user's entry so the bumped
+  // token_version signs out their existing devices right away.
+  invalidateUserCache(user.id)
 
   return res.status(200).json({ success: true })
 }

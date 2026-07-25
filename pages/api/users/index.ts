@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? Object.fromEntries(ALLOWED_PERMS.filter(k => k in perms).map(k => [k, Boolean(perms[k])]))
         : undefined
 
-      await updateUser(id, bakery_id, { role: safeRole, perms: safePerms, status: safeStatus })
+      await updateUser(id, bakery_id, user.id, { role: safeRole, perms: safePerms, status: safeStatus })
 
       await logAudit({
         bakery_id, actor_id: user.id, actor_name: user.name,
@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { id } = req.body
       if (typeof id !== 'string' || !id) return res.status(400).json({ error: 'id is required' })
 
-      await deleteUser(id, bakery_id)
+      await deleteUser(id, bakery_id, user.id)
 
       await logAudit({
         bakery_id, actor_id: user.id, actor_name: user.name,
@@ -58,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     res.status(405).end()
   } catch (e: any) {
-    const status = e.message === 'Cannot delete admin' ? 403 : e.message === 'User not found' ? 404 : 500
+    const status = e.message?.startsWith('Cannot ') ? 403 : e.message === 'User not found' ? 404 : 500
     res.status(status).json({ error: e.message })
   }
 }
