@@ -9,9 +9,21 @@ const GD = '#0d7a5a'
 const DARK = '#0b0f1a'
 
 const FEATURES = [
-  { badge: 'كاشير احترافي', title: 'فواتير في ثوانٍ', desc: 'واجهة كاشير سريعة تعمل على أي جهاز — جوال، تابلت، أو كمبيوتر — بدون تعقيد.' },
-  { badge: 'مخزون ذكي', title: 'تتبع كل مادة خام', desc: 'خصم تلقائي من المخزون مع كل بيع، وتنبيهات فورية عند نفاد المواد.' },
-  { badge: 'تقارير تفصيلية', title: 'قرارات مبنية على بيانات', desc: 'تقارير يومية وشهرية للمبيعات والأرباح والتكاليف بضغطة واحدة.' },
+  {
+    badge:   { ar: 'كاشير احترافي',    en: 'Pro Cashier' },
+    title:   { ar: 'فواتير في ثوانٍ',  en: 'Invoices in Seconds' },
+    desc:    { ar: 'واجهة كاشير سريعة تعمل على أي جهاز — جوال، تابلت، أو كمبيوتر — بدون تعقيد.', en: 'A fast POS interface that runs on any device — phone, tablet, or desktop — with zero complexity.' },
+  },
+  {
+    badge:   { ar: 'مخزون ذكي',          en: 'Smart Inventory' },
+    title:   { ar: 'تتبع كل مادة خام',   en: 'Track Every Ingredient' },
+    desc:    { ar: 'خصم تلقائي من المخزون مع كل بيع، وتنبيهات فورية عند نفاد المواد.', en: 'Auto-deduct stock with every sale and get instant alerts when ingredients run low.' },
+  },
+  {
+    badge:   { ar: 'تقارير تفصيلية',        en: 'Detailed Reports' },
+    title:   { ar: 'قرارات مبنية على بيانات', en: 'Data-Driven Decisions' },
+    desc:    { ar: 'تقارير يومية وشهرية للمبيعات والأرباح والتكاليف بضغطة واحدة.', en: 'Daily and monthly reports for sales, profit, and costs — one tap away.' },
+  },
 ]
 
 export default function LoginPage() {
@@ -28,6 +40,7 @@ export default function LoginPage() {
   const [featureIdx, setFeatureIdx] = useState(0)
   const isAR = lang === 'ar'
   const feat = FEATURES[featureIdx]
+  const fl = isAR ? 'ar' : 'en'
 
   const handleLogin = async () => {
     setError('')
@@ -92,14 +105,14 @@ export default function LoginPage() {
           {/* Badge */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(22,166,121,0.12)', border: '1px solid rgba(22,166,121,0.28)', borderRadius: 99, padding: '6px 16px', fontSize: 13, color: '#34d399', fontWeight: 600, marginBottom: 28, width: 'fit-content' }}>
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: G, boxShadow: `0 0 8px ${G}` }} />
-            {feat.badge}
+            {feat.badge[fl]}
           </div>
 
           <h2 style={{ fontSize: 'clamp(32px,3.5vw,52px)', fontWeight: 900, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1.1, marginBottom: 20 }}>
-            {feat.title}
+            {feat.title[fl]}
           </h2>
           <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)', lineHeight: 1.85, maxWidth: 400 }}>
-            {feat.desc}
+            {feat.desc[fl]}
           </p>
         </div>
 
@@ -208,8 +221,12 @@ export default function LoginPage() {
                 <div style={{ width: 52, height: 52, background: '#f0fdf9', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={G} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
                 </div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.5px', marginBottom: 8 }}>أدخل كود الدخول</div>
-                <div style={{ fontSize: 14, color: '#94a3b8' }}>الكود الخاص بمنشأتك — تواصل مع المدير للحصول عليه</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.5px', marginBottom: 8 }}>
+                  {isAR ? 'أدخل كود الدخول' : 'Enter Access Code'}
+                </div>
+                <div style={{ fontSize: 14, color: '#94a3b8' }}>
+                  {isAR ? 'الكود الخاص بمنشأتك — تواصل مع المدير للحصول عليه' : 'Your bakery access code — contact your manager if you don\'t have it'}
+                </div>
               </div>
 
               {error && (
@@ -229,12 +246,12 @@ export default function LoginPage() {
 
               <button onClick={handleCodeSubmit} disabled={loading}
                 style={{ width: '100%', background: loading ? '#9ca3af' : G, border: 'none', borderRadius: 11, padding: '13px', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', color: '#fff', boxShadow: loading ? 'none' : `0 4px 20px rgba(22,166,121,0.35)`, transition: 'all 0.15s', marginBottom: 16 }}>
-                {loading ? '...' : 'تأكيد'}
+                {loading ? '...' : (isAR ? 'تأكيد' : 'Confirm')}
               </button>
 
               <button onClick={() => { setStep('credentials'); setAccessCode(''); setError('') }}
                 style={{ width: '100%', background: 'none', border: '1.5px solid #e5e7eb', borderRadius: 11, padding: '12px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', color: '#6b7280' }}>
-                ← رجوع
+                {isAR ? '→ رجوع' : '← Back'}
               </button>
             </>
           )}

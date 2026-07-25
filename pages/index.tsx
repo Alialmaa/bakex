@@ -4,7 +4,6 @@ import { useState } from 'react'
 const G = '#16a679'
 const GD = '#0d7a5a'
 const DARK = '#0b0f1a'
-const DARK2 = '#111827'
 
 export default function Landing() {
   const router = useRouter()
@@ -123,7 +122,7 @@ export default function Landing() {
             {/* Mock topbar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>لوحة التحكم — اليوم</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>الجمعة ٢٥ يوليو ٢٠٢٥</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }} suppressHydrationWarning>{new Date().toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
             </div>
             {/* KPI Row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
@@ -378,7 +377,7 @@ export default function Landing() {
                 </div>
                 <span style={{ fontWeight: 900, fontSize: 20, color: '#fff' }}>Bake<span style={{ color: G }}>x</span></span>
               </div>
-              <p style={{ fontSize: 13.5, color: '#334155', lineHeight: 1.85, maxWidth: 240 }}>حلول متكاملة لإدارة المخابز السعودية من المخزون حتى الكاشير.</p>
+              <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.35)', lineHeight: 1.85, maxWidth: 240 }}>حلول متكاملة لإدارة المخابز السعودية من المخزون حتى الكاشير.</p>
             </div>
             {[
               { title: 'المنتج', links: ['المميزات','الأسعار','كيف يعمل','الكاشير'] },
@@ -386,14 +385,14 @@ export default function Landing() {
               { title: 'الدعم', links: ['مركز المساعدة','دليل البدء','الفيديوهات','تواصل مباشر'] },
             ].map(col => (
               <div key={col.title}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 18 }}>{col.title}</div>
-                {col.links.map(l => <div key={l} style={{ fontSize: 13.5, color: '#334155', marginBottom: 12, cursor: 'pointer', transition: 'color 0.15s' }} onMouseEnter={e => e.currentTarget.style.color = '#94a3b8'} onMouseLeave={e => e.currentTarget.style.color = '#334155'}>{l}</div>)}
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 18 }}>{col.title}</div>
+                {col.links.map(l => <div key={l} style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.35)', marginBottom: 12, cursor: 'pointer', transition: 'color 0.15s' }} onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.75)'} onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}>{l}</div>)}
               </div>
             ))}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-            <div style={{ fontSize: 13, color: '#1e293b' }}>© 2025 Bakex — جميع الحقوق محفوظة</div>
-            <div style={{ fontSize: 13, color: '#1e293b' }}>مصنوع بـ ❤️ في السعودية 🇸🇦</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>© 2025 Bakex — جميع الحقوق محفوظة</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>مصنوع بـ ❤️ في السعودية 🇸🇦</div>
           </div>
         </div>
       </footer>
