@@ -35,7 +35,25 @@ CREATE TABLE IF NOT EXISTS invoices (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_number ON invoices (bakery_id, invoice_number);
+-- IF NOT EXISTS skips only when an index of that NAME exists; it does not skip
+-- because the data would violate the constraint. If this table already holds
+-- two invoices sharing a number, the statement below aborts the whole
+-- migration, so report the conflict instead of failing on it.
+DO $$
+DECLARE v_dupes INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_dupes FROM (
+    SELECT bakery_id, invoice_number FROM invoices
+    GROUP BY bakery_id, invoice_number HAVING COUNT(*) > 1
+  ) d;
+
+  IF v_dupes > 0 THEN
+    RAISE WARNING 'Skipped unique index: % duplicate invoice numbers exist. Resolve them, then run: CREATE UNIQUE INDEX idx_invoices_number ON invoices (bakery_id, invoice_number);', v_dupes;
+  ELSE
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_number ON invoices (bakery_id, invoice_number);
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_invoices_bakery_date  ON invoices (bakery_id, created_at DESC);
 
 
@@ -104,7 +122,13 @@ CREATE POLICY "deny_direct_access" ON invoices    FOR ALL TO anon, authenticated
 CREATE POLICY "deny_direct_access" ON audit_log   FOR ALL TO anon, authenticated USING (false);
 CREATE POLICY "deny_direct_access" ON invoice_seq FOR ALL TO anon, authenticated USING (false);
 
+-- Revoke the default PUBLIC grant, then hand EXECUTE back to the role the API
+-- actually connects as. The revoke alone is not safe: EXECUTE reaches
+-- service_role only through Supabase's default privileges, and if those are not
+-- in place the call fails with "permission denied for function" — which would
+-- stop the cashier and production outright.
 REVOKE ALL ON FUNCTION next_invoice_seq(UUID, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION next_invoice_seq(UUID, TEXT) TO service_role;
 
 
 -- 5. Confirm what this run found

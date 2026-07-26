@@ -143,7 +143,24 @@ $$;
 -- produce_recipe's upsert needs a key to conflict on. A bakery should not have
 -- two stock rows with the same name anyway — getStockByName() calls .single()
 -- and would error if it did.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_bakery_name ON stock (bakery_id, name);
+--
+-- IF NOT EXISTS skips only when an index of that NAME exists, not when the data
+-- would violate the constraint, so duplicates would abort this whole migration.
+-- Report them instead and leave the rest of the migration applied.
+DO $$
+DECLARE v_dupes INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_dupes FROM (
+    SELECT bakery_id, name FROM stock
+    GROUP BY bakery_id, name HAVING COUNT(*) > 1
+  ) d;
+
+  IF v_dupes > 0 THEN
+    RAISE WARNING 'Skipped unique index: % duplicate (bakery_id, name) stock rows exist. produce_recipe cannot run until they are merged. See the query in the migration notes.', v_dupes;
+  ELSE
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_bakery_name ON stock (bakery_id, name);
+  END IF;
+END $$;
 
 
 -- 3. Atomic stock adjustment (purchases)
@@ -169,8 +186,46 @@ $$;
 
 -- 4. Lock the helpers down
 -- ────────────────────────────────────────────────────────────
--- Postgres grants EXECUTE on new functions to PUBLIC by default. Only the
--- service role used by the API routes should be able to call these.
+-- Postgres grants EXECUTE on new functions to PUBLIC by default. Only the role
+-- the API connects as should be able to call these.
+--
+-- The grant back to service_role is not optional: revoking PUBLIC leaves
+-- EXECUTE reaching service_role only via Supabase's default privileges, and if
+-- those are absent every call fails with "permission denied for function" —
+-- which for produce_recipe means production stops entirely.
 REVOKE ALL ON FUNCTION rate_limit_hit(TEXT, INTEGER, INTEGER)          FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION produce_recipe(UUID, UUID, INTEGER, UUID)       FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION adjust_stock_qty(UUID, TEXT, NUMERIC, NUMERIC)  FROM PUBLIC, anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION rate_limit_hit(TEXT, INTEGER, INTEGER)         TO service_role;
+GRANT EXECUTE ON FUNCTION produce_recipe(UUID, UUID, INTEGER, UUID)      TO service_role;
+GRANT EXECUTE ON FUNCTION adjust_stock_qty(UUID, TEXT, NUMERIC, NUMERIC) TO service_role;
+
+
+-- 5. Report the result
+-- ────────────────────────────────────────────────────────────
+-- `stock_unique_index` false means duplicates blocked it; merge them and create
+-- the index by hand, because produce_recipe's upsert needs it:
+--
+--   -- inspect first
+--   SELECT bakery_id, name, COUNT(*), SUM(qty)
+--     FROM stock GROUP BY bakery_id, name HAVING COUNT(*) > 1;
+--
+--   -- then, per group: keep the oldest row with the summed quantity and the
+--   -- highest unit price, and delete the rest
+--   WITH ranked AS (
+--     SELECT id, bakery_id, name, qty, price_per_unit,
+--            ROW_NUMBER() OVER (PARTITION BY bakery_id, name ORDER BY created_at NULLS LAST, id) AS rn,
+--            SUM(qty)          OVER (PARTITION BY bakery_id, name) AS total_qty,
+--            MAX(price_per_unit) OVER (PARTITION BY bakery_id, name) AS best_price
+--       FROM stock
+--   )
+--   UPDATE stock s SET qty = r.total_qty, price_per_unit = r.best_price
+--     FROM ranked r WHERE s.id = r.id AND r.rn = 1;
+--   DELETE FROM stock WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+
+SELECT 'rate_limits table'   AS object, to_regclass('public.rate_limits') IS NOT NULL AS ok
+UNION ALL SELECT 'rate_limit_hit()',    EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'rate_limit_hit')
+UNION ALL SELECT 'produce_recipe()',    EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'produce_recipe')
+UNION ALL SELECT 'adjust_stock_qty()',  EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'adjust_stock_qty')
+UNION ALL SELECT 'stock_unique_index',  EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_stock_bakery_name');
