@@ -102,16 +102,27 @@ RETURNS TABLE (day DATE, total NUMERIC)
 LANGUAGE SQL
 STABLE
 AS $sdt$
-  SELECT d.day::DATE,
-         COALESCE(SUM(s.total), 0) AS total
-    -- Cast explicitly: generate_series has both timestamp and timestamptz
-    -- overloads, and passing a bare DATE leaves the choice ambiguous.
-    FROM generate_series(p_from::TIMESTAMP, p_to::TIMESTAMP, INTERVAL '1 day') AS d(day)
-    LEFT JOIN sales s
-           ON s.bakery_id = p_bakery_id
-          AND (s.created_at AT TIME ZONE 'UTC')::DATE = d.day::DATE
-   GROUP BY d.day
-   ORDER BY d.day;
+  -- The range predicate compares created_at directly so the
+  -- (bakery_id, created_at) index can be used. Putting the UTC conversion in
+  -- the join condition instead — (created_at AT TIME ZONE 'UTC')::date = day —
+  -- wraps the indexed column in an expression, which makes the index unusable
+  -- and forces a scan of every sale the bakery has: the opposite of the point.
+  --
+  -- Bucketing still happens in UTC, but only over the rows the range selected.
+  WITH totals AS (
+    SELECT (s.created_at AT TIME ZONE 'UTC')::DATE AS bucket,
+           SUM(s.total) AS total
+      FROM sales s
+     WHERE s.bakery_id = p_bakery_id
+       AND s.created_at >= (p_from::TIMESTAMP)       AT TIME ZONE 'UTC'
+       AND s.created_at <  ((p_to + 1)::TIMESTAMP)   AT TIME ZONE 'UTC'
+     GROUP BY 1
+  )
+  SELECT g.day::DATE,
+         COALESCE(t.total, 0)
+    FROM generate_series(p_from::TIMESTAMP, p_to::TIMESTAMP, INTERVAL '1 day') AS g(day)
+    LEFT JOIN totals t ON t.bucket = g.day::DATE
+   ORDER BY g.day;
 $sdt$;
 
 REVOKE ALL   ON FUNCTION sales_daily_totals(UUID, DATE, DATE) FROM PUBLIC, anon, authenticated;
