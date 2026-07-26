@@ -128,3 +128,40 @@ UNION ALL SELECT 'next_invoice_seq()',  EXISTS (SELECT 1 FROM pg_proc WHERE pron
 --
 -- If it returns rows, two sales share a number — resolve those before adding
 -- the index, and tell me what it returned.
+
+
+-- ─── STEP 7 — seed the counter from existing invoices ───────
+-- Only relevant if this database already holds invoices.
+--
+-- next_invoice_seq() was replaced, not created, on any database where it already
+-- existed. If the previous implementation counted from somewhere other than
+-- invoice_seq, that table starts empty and today's numbering restarts at 0001 —
+-- colliding with invoices already issued today.
+--
+-- Diagnose first:
+--
+--   SELECT (SELECT COUNT(*) FROM invoices)     AS invoice_rows,
+--          (SELECT COUNT(*) FROM invoice_seq)  AS seq_rows,
+--          (SELECT MAX(invoice_number) FROM invoices) AS highest_number,
+--          (SELECT COUNT(*) FROM audit_log)    AS audit_rows,
+--          (SELECT MIN(created_at) FROM audit_log) AS oldest_audit;
+--
+-- invoice_rows > 0 while seq_rows = 0 means the counter must be seeded before
+-- the next sale. The date_key comes out of invoice_number rather than
+-- created_at, so it matches exactly what the app generated regardless of the
+-- session's timezone.
+--
+--   INSERT INTO invoice_seq (bakery_id, date_key, last_value)
+--   SELECT bakery_id,
+--          substring(invoice_number from 'INV-(\d{8})-')      AS date_key,
+--          MAX((substring(invoice_number from '-(\d+)$'))::int) AS last_value
+--     FROM invoices
+--    WHERE bakery_id IS NOT NULL
+--      AND invoice_number ~ '^INV-\d{8}-\d+$'
+--    GROUP BY bakery_id, substring(invoice_number from 'INV-(\d{8})-')
+--   ON CONFLICT (bakery_id, date_key) DO UPDATE
+--     SET last_value = GREATEST(invoice_seq.last_value, EXCLUDED.last_value);
+--
+-- Then confirm the next number continues rather than repeats:
+--
+--   SELECT bakery_id, date_key, last_value FROM invoice_seq ORDER BY date_key DESC;
