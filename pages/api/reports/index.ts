@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth, isSuperAdmin } from '../../../lib/auth'
-import { listSales, getWeeklySales } from '../../../lib/db/sales'
+import { getWeeklySales, getSalesRevenue, getSalesByRecipe } from '../../../lib/db/sales'
 import { listRecipes } from '../../../lib/db/recipes'
 import { listStock } from '../../../lib/db/stock'
-import { listProduction } from '../../../lib/db/production'
+import { getProductionByRecipe } from '../../../lib/db/production'
 import { getPurchaseCostInRange } from '../../../lib/db/purchases'
 import { apiError } from '../../../lib/apiError'
 
@@ -21,14 +21,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const prevMonthStart = getPrevMonthStart()
     const prevMonthEnd = monthStart
 
-    const [sales, recipes, stock, prodLog, weeklySales, monthPurchaseCost, prevSales, prevPurchaseCost] = await Promise.all([
-      listSales(bakery_id, monthStart),
+    // recipes and stock are still fetched in full: they are small, and unit cost
+    // is business logic worth keeping readable in one place. Everything else is
+    // now an aggregate, so the row-heavy tables stay in the database — this used
+    // to pull every sale for two months plus the entire production history, on
+    // every call, and the page calls it every 30 seconds.
+    const [recipes, stock, salesByRecipe, prodByRecipe, weeklySales,
+           monthRev, monthPurchaseCost, prevRev, prevPurchaseCost] = await Promise.all([
       listRecipes(bakery_id),
       listStock(bakery_id),
-      listProduction(bakery_id),
+      getSalesByRecipe(bakery_id, monthStart),
+      getProductionByRecipe(bakery_id, monthStart),
       getWeeklySales(bakery_id),
+      getSalesRevenue(bakery_id, monthStart),
       getPurchaseCostInRange(bakery_id, monthStart),
-      listSales(bakery_id, prevMonthStart, prevMonthEnd),
+      getSalesRevenue(bakery_id, prevMonthStart, prevMonthEnd),
       getPurchaseCostInRange(bakery_id, prevMonthStart, prevMonthEnd),
     ])
 
@@ -44,9 +51,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Per-product breakdown
     const data = (recipes || []).map((r: any) => {
-      const rSales = (sales || []).filter((s: any) => s.recipe_id === r.id)
-      const qty = rSales.reduce((s: number, l: any) => s + l.qty, 0)
-      const revenue = rSales.reduce((s: number, l: any) => s + l.total, 0)
+      const agg = salesByRecipe.get(r.id)
+      const qty = agg?.qty ?? 0
+      const revenue = agg?.revenue ?? 0
       const unitCost = getUnitCost(r)
       const cost = unitCost * qty
       const profit = revenue - cost
@@ -55,19 +62,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }).filter((d: any) => d.qty > 0 || d.revenue > 0)
 
     // Production summary
-    const prodMap: Record<string, any> = {}
-    for (const l of (prodLog || [])) {
-      if (!prodMap[l.recipe_id]) {
-        const recipe = (recipes || []).find((r: any) => r.id === l.recipe_id)
-        const unitCost = recipe ? getUnitCost(recipe) : 0
-        prodMap[l.recipe_id] = { recipe_name: l.recipe_name, output_unit: l.output_unit, total: 0, unitCost, totalCost: 0 }
+    const prodSummary = prodByRecipe.map(p => {
+      const recipe = (recipes || []).find((r: any) => r.id === p.recipe_id)
+      const unitCost = recipe ? getUnitCost(recipe) : 0
+      return {
+        recipe_name: p.recipe_name,
+        output_unit: p.output_unit,
+        total: p.total,
+        unitCost,
+        totalCost: p.total * unitCost,
       }
-      prodMap[l.recipe_id].total += l.output_qty
-      prodMap[l.recipe_id].totalCost += l.output_qty * prodMap[l.recipe_id].unitCost
-    }
-
-    const monthRev = (sales || []).reduce((s: number, r: any) => s + r.total, 0)
-    const prevRev = (prevSales || []).reduce((s: number, r: any) => s + r.total, 0)
+    })
 
     // Real profit = revenue - actual purchase cost this month
     const monthProfit = monthRev - monthPurchaseCost
@@ -83,7 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json({
       data,
       totals,
-      prodSummary: Object.values(prodMap),
+      prodSummary,
       weeklySales,
       comparison: {
         thisMonth: { revenue: monthRev, profit: monthProfit },

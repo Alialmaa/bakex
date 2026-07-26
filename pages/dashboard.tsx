@@ -5,8 +5,8 @@ import Layout from '../components/Layout'
 import { MetricCard, Icons } from '../components/Metric'
 import { T } from '../lib/translations'
 import { useLang } from '../lib/useLang'
-import { listSales, getWeeklySales } from '../lib/db/sales'
-import { listStock } from '../lib/db/stock'
+import { getWeeklySales, getSalesRevenue, getSalesByRecipe } from '../lib/db/sales'
+import { getLowStockCount, listLowStock } from '../lib/db/stock'
 import { listProduction } from '../lib/db/production'
 import { countPendingUsers } from '../lib/db/users'
 import { getPurchaseCostInRange } from '../lib/db/purchases'
@@ -254,45 +254,42 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const today = new Date().toISOString().split('T')[0]
   const monthStart = today.slice(0, 7) + '-01'
 
-  const [todaySales, monthSales, stock, prodLog, pendingCount, weeklySales, monthCost, recipes] = await Promise.all([
-    listSales(bakery_id, today),
-    listSales(bakery_id, monthStart),
-    listStock(bakery_id),
-    listProduction(bakery_id),
+  // Totals are aggregates now. This used to fetch every sale for today AND for
+  // the month, plus the entire production history, then reduce all of it here
+  // just to display five numbers and a top-five list.
+  const [todayRev, monthRev, lowStock, alertRows, recentLog, pendingCount,
+         weeklySales, monthCost, recipes, salesByRecipe] = await Promise.all([
+    getSalesRevenue(bakery_id, today),
+    getSalesRevenue(bakery_id, monthStart),
+    getLowStockCount(bakery_id),
+    listLowStock(bakery_id, 4),
+    listProduction(bakery_id, undefined, 5),
     user.perms?.users ? countPendingUsers(bakery_id) : Promise.resolve(0),
     getWeeklySales(bakery_id),
     getPurchaseCostInRange(bakery_id, monthStart),
     listRecipes(bakery_id),
+    getSalesByRecipe(bakery_id, monthStart),
   ])
 
-  const todayRev = (todaySales || []).reduce((s: number, r: any) => s + r.total, 0)
-  const monthRev = (monthSales || []).reduce((s: number, r: any) => s + r.total, 0)
   const monthProfit = monthRev - monthCost
-  const lowStock = (stock || []).filter((m: any) => m.qty < m.min_qty).length
 
-  const alertsList = (stock || [])
-    .filter((m: any) => m.qty < m.min_qty)
-    .slice(0, 4)
-    .map((m: any) => ({
-      type: m.qty === 0 ? 'error' : 'warn',
-      msg: `${m.name}: ${m.qty} ${m.unit} (min: ${m.min_qty})`
-    }))
+  const alertsList = (alertRows || []).map((m: any) => ({
+    type: m.qty === 0 ? 'error' : 'warn',
+    msg: `${m.name}: ${m.qty} ${m.unit} (min: ${m.min_qty})`,
+  }))
 
-  const recentLog = (prodLog || [])
-    .slice(0, 5)
-    .map((l: any) => ({ ...l, label: `${l.recipe_name} × ${l.output_qty} ${l.output_unit}` }))
+  const activity = (recentLog || []).map((l: any) => ({
+    ...l,
+    label: `${l.recipe_name} × ${l.output_qty} ${l.output_unit}`,
+  }))
 
-  const recipeMap: Record<string, { name: string; qty: number; revenue: number }> = {}
-  for (const r of recipes || []) recipeMap[r.id] = { name: r.name, qty: 0, revenue: 0 }
-  for (const s of monthSales || []) {
-    if (recipeMap[s.recipe_id]) {
-      recipeMap[s.recipe_id].qty += s.qty
-      recipeMap[s.recipe_id].revenue += s.total
-    }
-  }
-  const topProducts = Object.values(recipeMap)
-    .filter(p => p.revenue > 0)
-    .sort((a, b) => b.revenue - a.revenue)
+  const topProducts = (recipes || [])
+    .map((r: any) => {
+      const agg = salesByRecipe.get(r.id)
+      return { name: r.name, qty: agg?.qty ?? 0, revenue: agg?.revenue ?? 0 }
+    })
+    .filter((p: any) => p.revenue > 0)
+    .sort((a: any, b: any) => b.revenue - a.revenue)
     .slice(0, 5)
 
   return {
@@ -300,7 +297,7 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
       user,
       stats: { todayRev, monthRev, monthProfit, monthCost, lowStock },
       alerts: alertsList,
-      recentLog,
+      recentLog: activity,
       pendingCount,
       weeklySales,
       topProducts,

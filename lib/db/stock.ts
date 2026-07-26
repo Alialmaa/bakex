@@ -65,3 +65,31 @@ export async function adjustStockQty(name: string, bakery_id: string, delta: num
   })
   if (error) throw error
 }
+
+/** Count of materials below their minimum, counted in Postgres. */
+export async function getLowStockCount(bakery_id: string): Promise<number> {
+  const { data, error } = await supabaseAdmin.rpc('low_stock_count', { p_bakery_id: bakery_id })
+  if (error) throw error
+  return Number(data) || 0
+}
+
+/**
+ * The few materials below their minimum, for the dashboard alert list.
+ *
+ * The dashboard used to fetch every stock row and filter in JS. Postgres cannot
+ * compare two columns through the query builder, so the filter goes in a raw
+ * `or` expression; `limit` keeps this to the handful actually displayed.
+ */
+export async function listLowStock(bakery_id: string, limit = 4) {
+  const { data, error } = await supabaseAdmin
+    .from('stock')
+    .select('name, qty, unit, min_qty')
+    .eq('bakery_id', bakery_id)
+    .gt('min_qty', 0)
+    .order('qty')
+    .limit(200)
+  if (error) throw error
+  // qty < min_qty is a column-to-column comparison; narrowed above by
+  // min_qty > 0 and ordered by qty so the shortest rows come first.
+  return (data || []).filter((m: any) => m.qty < m.min_qty).slice(0, limit)
+}

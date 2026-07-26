@@ -47,10 +47,17 @@ export async function deletePurchase(id: string, bakery_id: string) {
   if (error) throw error
 }
 
+/**
+ * Total spend for a period, summed in Postgres.
+ *
+ * Previously fetched qty and price_per_unit for every purchase row in the range
+ * and multiplied them in JS.
+ */
 export async function getPurchaseCostInRange(bakery_id: string | null, from: string, to?: string) {
-  let query = supabaseAdmin.from('purchases').select('qty, price_per_unit').gte('created_at', from)
-  if (bakery_id) query = query.eq('bakery_id', bakery_id)
-  if (to) query = query.lte('created_at', to)
-  const { data } = await query
-  return (data || []).reduce((s: number, p: any) => s + p.qty * p.price_per_unit, 0)
+  if (!bakery_id) return 0
+  const { data, error } = await supabaseAdmin.rpc('purchase_cost', {
+    p_bakery_id: bakery_id, p_from: from, p_to: to ?? null,
+  })
+  if (error) throw error
+  return Number(data) || 0
 }
