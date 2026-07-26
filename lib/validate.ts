@@ -16,6 +16,22 @@ export function requireNonNegativeNumber(value: unknown, field: string): string 
   return null
 }
 
+export const PASSWORD_MIN = 6
+// bcrypt only considers the first 72 bytes, so anything past that neither adds
+// security nor should be accepted as if it did; the ceiling also stops a
+// megabyte-long "password" from being handed to the hash function at all.
+export const PASSWORD_MAX = 72
+
+export function requirePassword(value: unknown, field = 'password'): string | null {
+  if (typeof value !== 'string' || value.length < PASSWORD_MIN)
+    return `${field} must be at least ${PASSWORD_MIN} characters`
+  // Measured in bytes: a 72-character limit would still let multibyte input
+  // exceed bcrypt's real boundary.
+  if (Buffer.byteLength(value, 'utf8') > PASSWORD_MAX)
+    return `${field} must be at most ${PASSWORD_MAX} bytes`
+  return null
+}
+
 export function requirePositiveNumber(value: unknown, field: string): string | null {
   if (typeof value !== 'number' || Number.isNaN(value) || !Number.isFinite(value) || value <= 0) {
     return `${field} must be a positive number`

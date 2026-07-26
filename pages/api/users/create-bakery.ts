@@ -7,6 +7,7 @@ import { checkRateLimit, RATE_LIMITS } from '../../../lib/rateLimit'
 import { clientIp } from '../../../lib/clientIp'
 import { sendVerificationEmail } from '../../../lib/email'
 import { appUrl } from '../../../lib/appUrl'
+import { requirePassword } from '../../../lib/validate'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -24,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.redirect(302, '/register?error=invalid_email')
   if (typeof phone !== 'string' || phone.length > 20)
     return res.redirect(302, '/register?error=invalid_input')
-  if (password.length < 6)
+  if (requirePassword(password))
     return res.redirect(302, '/register?error=short_password')
 
   const limit = await checkRateLimit(`register:${clientIp(req)}`, RATE_LIMITS.register)

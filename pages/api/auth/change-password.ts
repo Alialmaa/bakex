@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth, comparePassword, hashPassword, signToken, setAuthCookie, invalidateUserCache } from '../../../lib/auth'
 import { supabaseAdmin } from '../../../lib/supabase'
+import { requirePassword } from '../../../lib/validate'
 import { checkRateLimit, RATE_LIMITS } from '../../../lib/rateLimit'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

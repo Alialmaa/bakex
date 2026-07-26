@@ -13,11 +13,17 @@ const SECRET = process.env.JWT_SECRET
 export const hashPassword = (password: string) => bcrypt.hashSync(password, 10)
 export const comparePassword = (password: string, hash: string) => bcrypt.compareSync(password, hash)
 
+// The token is symmetric (HS256). Pinning the algorithm on both sides stops a
+// verifier from being talked into accepting a different one — jsonwebtoken 9
+// already rejects `alg: none`, but the pin keeps that true across upgrades and
+// removes the whole class of algorithm-confusion tricks by construction.
+const JWT_ALG = 'HS256' as const
+
 export const signToken = (payload: object) =>
-  jwt.sign(payload, SECRET, { expiresIn: '8h' })
+  jwt.sign(payload, SECRET, { algorithm: JWT_ALG, expiresIn: '8h' })
 
 export const verifyToken = (token: string) => {
-  try { return jwt.verify(token, SECRET) as any }
+  try { return jwt.verify(token, SECRET, { algorithms: [JWT_ALG] }) as any }
   catch { return null }
 }
 

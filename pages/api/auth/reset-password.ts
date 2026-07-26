@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../../../lib/supabase'
 import { hashPassword, invalidateUserCache } from '../../../lib/auth'
 import { checkRateLimit, RATE_LIMITS } from '../../../lib/rateLimit'
 import { clientIp } from '../../../lib/clientIp'
+import { requirePassword } from '../../../lib/validate'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()

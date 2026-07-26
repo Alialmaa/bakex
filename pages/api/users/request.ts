@@ -6,6 +6,7 @@ import { supabaseAdmin } from '../../../lib/supabase'
 import { checkRateLimit, RATE_LIMITS } from '../../../lib/rateLimit'
 import { clientIp } from '../../../lib/clientIp'
 import { apiError } from '../../../lib/apiError'
+import { requirePassword } from '../../../lib/validate'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -17,8 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'name must be at most 100 characters' })
   if (typeof username !== 'string' || username.length > 50)
     return res.status(400).json({ error: 'username must be at most 50 characters' })
-  if (typeof password !== 'string' || password.length < 6)
-    return res.status(400).json({ error: 'Password must be at least 6 characters' })
+  const pwErr = requirePassword(password)
+  if (pwErr) return res.status(400).json({ error: pwErr })
 
   const limit = await checkRateLimit(`register:${clientIp(req)}`, RATE_LIMITS.register)
   if (!limit.allowed) return res.status(429).json({ error: `Too many attempts. Try again in ${limit.retryAfterSec}s.` })

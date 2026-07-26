@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requirePerm } from '../../../lib/auth'
 import { createUser } from '../../../lib/db/users'
 import { apiError } from '../../../lib/apiError'
+import { requirePassword } from '../../../lib/validate'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -16,8 +17,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'name must be at most 100 characters' })
   if (typeof username !== 'string' || username.length > 50)
     return res.status(400).json({ error: 'username must be at most 50 characters' })
-  if (typeof password !== 'string' || password.length < 6)
-    return res.status(400).json({ error: 'Password must be at least 6 characters' })
+  const pwErr = requirePassword(password)
+  if (pwErr) return res.status(400).json({ error: pwErr })
 
   const ALLOWED_ROLES = ['staff', 'manager', 'readonly']
   const safeRole = ALLOWED_ROLES.includes(role) ? role : 'staff'
