@@ -93,7 +93,9 @@ STABLE
 AS $sdt$
   SELECT d.day::DATE,
          COALESCE(SUM(s.total), 0) AS total
-    FROM generate_series(p_from, p_to, INTERVAL '1 day') AS d(day)
+    -- Cast explicitly: generate_series has both timestamp and timestamptz
+    -- overloads, and passing a bare DATE leaves the choice ambiguous.
+    FROM generate_series(p_from::TIMESTAMP, p_to::TIMESTAMP, INTERVAL '1 day') AS d(day)
     LEFT JOIN sales s
            ON s.bakery_id = p_bakery_id
           AND (s.created_at AT TIME ZONE 'UTC')::DATE = d.day::DATE
@@ -162,6 +164,25 @@ AS $lsc$
 $lsc$;
 
 
+-- ─── STEP 7b — low stock items ──────────────────────────────
+-- The alert list needs rows, not just a count. PostgREST cannot express a
+-- column-to-column comparison (qty < min_qty), so without this the application
+-- had to fetch a slice of the table and filter it in JS.
+CREATE OR REPLACE FUNCTION low_stock_items(p_bakery_id UUID, p_limit INTEGER DEFAULT 4)
+RETURNS TABLE (name TEXT, qty NUMERIC, unit TEXT, min_qty NUMERIC)
+LANGUAGE SQL
+STABLE
+AS $lsi$
+  SELECT s.name, s.qty, s.unit, s.min_qty
+    FROM stock s
+   WHERE s.bakery_id = p_bakery_id
+     AND s.min_qty > 0
+     AND s.qty < s.min_qty
+   ORDER BY s.qty ASC
+   LIMIT GREATEST(1, LEAST(p_limit, 100));
+$lsi$;
+
+
 -- ─── STEP 8 — permissions ───────────────────────────────────
 -- Same reasoning as migrations 002 and 003: revoking PUBLIC leaves EXECUTE
 -- reaching service_role only through Supabase's defaults, so grant it back.
@@ -171,6 +192,7 @@ REVOKE ALL ON FUNCTION sales_daily_totals(UUID, DATE, DATE)                 FROM
 REVOKE ALL ON FUNCTION purchase_cost(UUID, TIMESTAMPTZ, TIMESTAMPTZ)        FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION production_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION low_stock_count(UUID)                                FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION low_stock_items(UUID, INTEGER)                       FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION sales_revenue(UUID, TIMESTAMPTZ, TIMESTAMPTZ)        TO service_role;
 GRANT EXECUTE ON FUNCTION sales_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ)      TO service_role;
@@ -178,6 +200,7 @@ GRANT EXECUTE ON FUNCTION sales_daily_totals(UUID, DATE, DATE)                 T
 GRANT EXECUTE ON FUNCTION purchase_cost(UUID, TIMESTAMPTZ, TIMESTAMPTZ)        TO service_role;
 GRANT EXECUTE ON FUNCTION production_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
 GRANT EXECUTE ON FUNCTION low_stock_count(UUID)                                TO service_role;
+GRANT EXECUTE ON FUNCTION low_stock_items(UUID, INTEGER)                       TO service_role;
 
 
 -- ─── STEP 9 — report ────────────────────────────────────────
@@ -186,5 +209,5 @@ SELECT p.proname AS function, true AS created
   JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE n.nspname = 'public'
    AND p.proname IN ('sales_revenue','sales_by_recipe','sales_daily_totals',
-                     'purchase_cost','production_by_recipe','low_stock_count')
+                     'purchase_cost','production_by_recipe','low_stock_count','low_stock_items')
  ORDER BY p.proname;
