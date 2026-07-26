@@ -192,7 +192,8 @@ export default function UsersPage({ user, initialUsers }: any) {
           ) : activeUsers.map(u => {
             const rc = ROLE_CONFIG[u.role as keyof typeof ROLE_CONFIG]
             const permCount = Object.values(u.perms || {}).filter(Boolean).length
-            const locked = u.role === 'admin'
+            // The API refuses both, so do not present them as available.
+            const locked = u.role === 'admin' || u.id === user.id
             return (
               <div key={u.id} className="trow" style={{ gridTemplateColumns: '34px 1fr auto 64px', gap: 10 }}>
                 <div className="avatar" style={{ width: 34, height: 34, fontSize: 13, background: rc?.bg, color: rc?.color }}>
