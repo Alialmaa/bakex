@@ -74,13 +74,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     bakery_access_code = bakery?.access_code ?? null
   }
 
+  // The password was correct, so the account-guessing counter can be cleared:
+  // an attacker who does not know the password can never keep the owner out.
+  // The access code is a *separate* secret and gets its own counter below —
+  // clearing this one here does not vouch for the code.
+  await resetRateLimit(acctKey)
+
   // Access code check (only for non-super-admin bakery accounts that have a code set)
   if (user.role !== 'super_admin' && bakery_access_code) {
     if (!access_code) {
       return res.status(200).json({ needs_code: true })
     }
+
+    // The code is a second secret that an attacker who already has the password
+    // would otherwise get unlimited guesses at, so it has its own counter.
+    //
+    // Unlike the account counter, this one is NOT reset on success, and must not
+    // be: resetting it takes a correct code, which only the legitimate owner
+    // enters — and their daily login would then hand the attacker a fresh batch
+    // of guesses every day. The window simply expires instead. Someone who knows
+    // their own code will not exhaust ten attempts in fifteen minutes.
+    const codeKey = `login:code:${user.id}`
+    const codeLimit = await peekRateLimit(codeKey, RATE_LIMITS.loginAccount)
+    if (!codeLimit.allowed) {
+      return res.status(429).json({ error: `Too many attempts. Try again in ${codeLimit.retryAfterSec}s.` })
+    }
+
     if (typeof access_code !== 'string' || !timingSafeEqualStr(access_code, bakery_access_code)) {
-      await checkRateLimit(acctKey, RATE_LIMITS.loginAccount)
+      await checkRateLimit(codeKey, RATE_LIMITS.loginAccount)
       return res.status(401).json({ error: 'كود الدخول غير صحيح' })
     }
   }
@@ -95,10 +116,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     bakery_name,
     tv: user.token_version ?? 0,
   })
-
-  // Correct credentials clear the account counter, so someone guessing against
-  // an account can never keep its owner out.
-  await resetRateLimit(acctKey)
 
   setAuthCookie(res, token)
   res.status(200).json({ success: true })
