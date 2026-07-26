@@ -3,6 +3,11 @@
 -- Apply in: Supabase Dashboard → SQL Editor
 --
 -- Run the steps ONE AT A TIME.
+--
+-- Each function is followed immediately by its own REVOKE/GRANT. Collecting the
+-- permissions into a single step at the end meant that if a CREATE failed and
+-- went unnoticed, the permissions step aborted on "function does not exist" —
+-- reporting the symptom rather than the step that actually failed.
 -- ============================================================
 --
 -- The dashboard and reports pages each pulled every sale, purchase and
@@ -48,6 +53,9 @@ AS $srv$
      AND (p_to IS NULL OR created_at <= p_to);
 $srv$;
 
+REVOKE ALL   ON FUNCTION sales_revenue(UUID, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION sales_revenue(UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
+
 
 -- ─── STEP 3 — sales grouped per recipe ──────────────────────
 -- Feeds the product breakdown table. recipe_id is nullable on sales, so rows
@@ -70,6 +78,9 @@ AS $sbr$
      AND (p_to IS NULL OR s.created_at <= p_to)
    GROUP BY s.recipe_id;
 $sbr$;
+
+REVOKE ALL   ON FUNCTION sales_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION sales_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
 
 
 -- ─── STEP 4 — daily sales totals ────────────────────────────
@@ -103,6 +114,9 @@ AS $sdt$
    ORDER BY d.day;
 $sdt$;
 
+REVOKE ALL   ON FUNCTION sales_daily_totals(UUID, DATE, DATE) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION sales_daily_totals(UUID, DATE, DATE) TO service_role;
+
 
 -- ─── STEP 5 — purchase cost for a period ────────────────────
 -- Replaces fetching qty and price_per_unit for every purchase row to multiply
@@ -122,6 +136,9 @@ AS $pc$
      AND created_at >= p_from
      AND (p_to IS NULL OR created_at <= p_to);
 $pc$;
+
+REVOKE ALL   ON FUNCTION purchase_cost(UUID, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION purchase_cost(UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
 
 
 -- ─── STEP 6 — production grouped per recipe ─────────────────
@@ -147,6 +164,9 @@ AS $pbr$
    GROUP BY p.recipe_id;
 $pbr$;
 
+REVOKE ALL   ON FUNCTION production_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION production_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
+
 
 -- ─── STEP 7 — low stock count ───────────────────────────────
 -- The dashboard pulled every stock row to count those below their minimum and
@@ -162,6 +182,9 @@ AS $lsc$
      AND min_qty > 0
      AND qty < min_qty;
 $lsc$;
+
+REVOKE ALL   ON FUNCTION low_stock_count(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION low_stock_count(UUID) TO service_role;
 
 
 -- ─── STEP 7b — low stock items ──────────────────────────────
@@ -182,28 +205,11 @@ AS $lsi$
    LIMIT GREATEST(1, LEAST(p_limit, 100));
 $lsi$;
 
-
--- ─── STEP 8 — permissions ───────────────────────────────────
--- Same reasoning as migrations 002 and 003: revoking PUBLIC leaves EXECUTE
--- reaching service_role only through Supabase's defaults, so grant it back.
-REVOKE ALL ON FUNCTION sales_revenue(UUID, TIMESTAMPTZ, TIMESTAMPTZ)        FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION sales_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ)      FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION sales_daily_totals(UUID, DATE, DATE)                 FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION purchase_cost(UUID, TIMESTAMPTZ, TIMESTAMPTZ)        FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION production_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION low_stock_count(UUID)                                FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION low_stock_items(UUID, INTEGER)                       FROM PUBLIC, anon, authenticated;
-
-GRANT EXECUTE ON FUNCTION sales_revenue(UUID, TIMESTAMPTZ, TIMESTAMPTZ)        TO service_role;
-GRANT EXECUTE ON FUNCTION sales_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ)      TO service_role;
-GRANT EXECUTE ON FUNCTION sales_daily_totals(UUID, DATE, DATE)                 TO service_role;
-GRANT EXECUTE ON FUNCTION purchase_cost(UUID, TIMESTAMPTZ, TIMESTAMPTZ)        TO service_role;
-GRANT EXECUTE ON FUNCTION production_by_recipe(UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
-GRANT EXECUTE ON FUNCTION low_stock_count(UUID)                                TO service_role;
-GRANT EXECUTE ON FUNCTION low_stock_items(UUID, INTEGER)                       TO service_role;
+REVOKE ALL   ON FUNCTION low_stock_items(UUID, INTEGER) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION low_stock_items(UUID, INTEGER) TO service_role;
 
 
--- ─── STEP 9 — report ────────────────────────────────────────
+-- ─── STEP 8 — report ────────────────────────────────────────
 SELECT p.proname AS function, true AS created
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
