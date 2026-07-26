@@ -1,6 +1,10 @@
 -- ============================================================
 -- Bakex Migration 002 — Rate limiting + atomic stock movements
--- Apply in: Supabase Dashboard → SQL Editor → Run
+-- Apply in: Supabase Dashboard → SQL Editor
+--
+-- Run migration 003 FIRST. Then run the sections below ONE AT A TIME rather
+-- than pasting the file whole — a truncated paste in the web editor is how this
+-- fails silently halfway.
 -- ============================================================
 
 
@@ -35,7 +39,7 @@ CREATE OR REPLACE FUNCTION rate_limit_hit(
 )
 RETURNS TABLE (allowed BOOLEAN, hits INTEGER, retry_after_sec INTEGER)
 LANGUAGE plpgsql
-AS $$
+AS $rl$
 DECLARE
   v_hits   INTEGER;
   v_start  TIMESTAMPTZ;
@@ -60,7 +64,7 @@ BEGIN
       (v_start + make_interval(secs => p_window_sec)) - now()
     )))::INTEGER;
 END;
-$$;
+$rl$;
 
 
 -- 2. Atomic production
@@ -79,7 +83,7 @@ CREATE OR REPLACE FUNCTION produce_recipe(
 )
 RETURNS TABLE (total_units NUMERIC, shortage TEXT)
 LANGUAGE plpgsql
-AS $$
+AS $pr$
 DECLARE
   v_recipe    RECORD;
   v_ing       JSONB;
@@ -138,29 +142,17 @@ BEGIN
 
   RETURN QUERY SELECT v_units, NULL::TEXT;
 END;
-$$;
+$pr$;
 
 -- produce_recipe's upsert needs a key to conflict on. A bakery should not have
 -- two stock rows with the same name anyway — getStockByName() calls .single()
 -- and would error if it did.
 --
--- IF NOT EXISTS skips only when an index of that NAME exists, not when the data
--- would violate the constraint, so duplicates would abort this whole migration.
--- Report them instead and leave the rest of the migration applied.
-DO $$
-DECLARE v_dupes INTEGER;
-BEGIN
-  SELECT COUNT(*) INTO v_dupes FROM (
-    SELECT bakery_id, name FROM stock
-    GROUP BY bakery_id, name HAVING COUNT(*) > 1
-  ) d;
-
-  IF v_dupes > 0 THEN
-    RAISE WARNING 'Skipped unique index: % duplicate (bakery_id, name) stock rows exist. produce_recipe cannot run until they are merged. See the query in the migration notes.', v_dupes;
-  ELSE
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_bakery_name ON stock (bakery_id, name);
-  END IF;
-END $$;
+-- IF NOT EXISTS skips only when an index of that NAME exists, not when existing
+-- rows would violate it — duplicates abort the whole migration. So this index is
+-- NOT created here: see STEP 5 at the end of the file, which has you check for
+-- duplicates first and add it separately. produce_recipe cannot run until it
+-- exists, so do not skip that step.
 
 
 -- 3. Atomic stock adjustment (purchases)
@@ -176,12 +168,12 @@ CREATE OR REPLACE FUNCTION adjust_stock_qty(
 )
 RETURNS VOID
 LANGUAGE SQL
-AS $$
+AS $adj$
   UPDATE stock
      SET qty = GREATEST(0, qty + p_delta),
          price_per_unit = COALESCE(p_new_price, price_per_unit)
    WHERE bakery_id = p_bakery_id AND name = p_name;
-$$;
+$adj$;
 
 
 -- 4. Lock the helpers down
@@ -204,28 +196,41 @@ GRANT EXECUTE ON FUNCTION adjust_stock_qty(UUID, TEXT, NUMERIC, NUMERIC) TO serv
 
 -- 5. Report the result
 -- ────────────────────────────────────────────────────────────
--- `stock_unique_index` false means duplicates blocked it; merge them and create
--- the index by hand, because produce_recipe's upsert needs it:
---
---   -- inspect first
---   SELECT bakery_id, name, COUNT(*), SUM(qty)
---     FROM stock GROUP BY bakery_id, name HAVING COUNT(*) > 1;
---
---   -- then, per group: keep the oldest row with the summed quantity and the
---   -- highest unit price, and delete the rest
---   WITH ranked AS (
---     SELECT id, bakery_id, name, qty, price_per_unit,
---            ROW_NUMBER() OVER (PARTITION BY bakery_id, name ORDER BY created_at NULLS LAST, id) AS rn,
---            SUM(qty)          OVER (PARTITION BY bakery_id, name) AS total_qty,
---            MAX(price_per_unit) OVER (PARTITION BY bakery_id, name) AS best_price
---       FROM stock
---   )
---   UPDATE stock s SET qty = r.total_qty, price_per_unit = r.best_price
---     FROM ranked r WHERE s.id = r.id AND r.rn = 1;
---   DELETE FROM stock WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
-
 SELECT 'rate_limits table'   AS object, to_regclass('public.rate_limits') IS NOT NULL AS ok
 UNION ALL SELECT 'rate_limit_hit()',    EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'rate_limit_hit')
 UNION ALL SELECT 'produce_recipe()',    EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'produce_recipe')
 UNION ALL SELECT 'adjust_stock_qty()',  EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'adjust_stock_qty')
 UNION ALL SELECT 'stock_unique_index',  EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_stock_bakery_name');
+
+
+-- ─── STEP 5 — the stock unique index (check, then act) ──────
+-- produce_recipe's upsert requires this index. Run the check on its own first;
+-- it should return no rows.
+--
+--   SELECT bakery_id, name, COUNT(*), SUM(qty)
+--     FROM stock GROUP BY bakery_id, name HAVING COUNT(*) > 1;
+--
+-- Nothing returned — add it:
+--
+--   CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_bakery_name ON stock (bakery_id, name);
+--
+-- Rows returned — merge each group first: keep the oldest row carrying the
+-- summed quantity and the highest unit price, drop the rest.
+--
+--   WITH ranked AS (
+--     SELECT id,
+--            ROW_NUMBER() OVER (PARTITION BY bakery_id, name ORDER BY created_at NULLS LAST, id) AS rn,
+--            SUM(qty)            OVER (PARTITION BY bakery_id, name) AS total_qty,
+--            MAX(price_per_unit) OVER (PARTITION BY bakery_id, name) AS best_price
+--       FROM stock
+--   )
+--   UPDATE stock s SET qty = r.total_qty, price_per_unit = r.best_price
+--     FROM ranked r WHERE s.id = r.id AND r.rn = 1;
+--
+--   WITH ranked AS (
+--     SELECT id, ROW_NUMBER() OVER (PARTITION BY bakery_id, name ORDER BY created_at NULLS LAST, id) AS rn
+--       FROM stock
+--   )
+--   DELETE FROM stock WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+--
+-- Then create the index. Tell me what the check returned before running either.
