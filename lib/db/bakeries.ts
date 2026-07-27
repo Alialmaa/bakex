@@ -74,3 +74,22 @@ export async function getBakeryUserCount(bakery_id: string) {
     .eq('bakery_id', bakery_id)
   return count ?? 0
 }
+
+/**
+ * User counts for every bakery, in one query.
+ *
+ * The bakeries page called getBakeryUserCount() once per row, so the super
+ * admin's list cost one round trip per bakery — 101 queries at 100 customers,
+ * and it gets slower with every signup. One narrow column for every user is a
+ * few hundred small rows even at that size.
+ */
+export async function getBakeryUserCounts(): Promise<Record<string, number>> {
+  const { data, error } = await supabaseAdmin.from('users').select('bakery_id')
+  if (error) throw error
+  const counts: Record<string, number> = {}
+  for (const row of (data as { bakery_id: string | null }[]) || []) {
+    if (!row.bakery_id) continue
+    counts[row.bakery_id] = (counts[row.bakery_id] ?? 0) + 1
+  }
+  return counts
+}

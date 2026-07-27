@@ -1,7 +1,7 @@
 import type { GetServerSideProps } from 'next'
 import { useState } from 'react'
 import { requirePage, isRedirect } from '../lib/auth'
-import { listBakeries, getBakeryUserCount } from '../lib/db/bakeries'
+import { listBakeries, getBakeryUserCounts } from '../lib/db/bakeries'
 import Layout from '../components/Layout'
 import { useLang } from '../lib/useLang'
 import { fmtDate } from '../lib/datetime'
@@ -364,12 +364,9 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   if (isRedirect(guard)) return guard
   const { user } = guard
 
-  const rows = await listBakeries()
-  const bakeries = await Promise.all(
-    (rows || []).map(async (b: any) => ({
-      ...b,
-      user_count: await getBakeryUserCount(b.id),
-    }))
-  )
+  // Two queries regardless of how many bakeries there are. This used to run one
+  // count query per bakery.
+  const [rows, counts] = await Promise.all([listBakeries(), getBakeryUserCounts()])
+  const bakeries = (rows || []).map((b: any) => ({ ...b, user_count: counts[b.id] ?? 0 }))
   return { props: { user, bakeries } }
 }

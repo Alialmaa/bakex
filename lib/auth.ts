@@ -137,6 +137,39 @@ export interface AuthOptions {
   skipSubscription?: boolean
 }
 
+/**
+ * Resolves the session and the bakery's subscription in one round trip instead
+ * of two.
+ *
+ * The subscription lookup needs a bakery id, which the session resolution
+ * produces — so the two ran back to back, and every page paid two sequential
+ * database round trips before it could start fetching its own data. Both caches
+ * are per-process, so on a low-traffic serverless deployment each request tends
+ * to land on a fresh instance and pay for both again.
+ *
+ * The token also carries `bakery_id`, so the subscription fetch starts from that
+ * immediately. Authorization still uses the value from the database: the
+ * prefetch is only used when the two agree, and otherwise discarded and redone.
+ */
+async function resolveSessionWithAccess(tokenUser: any, skipSubscription?: boolean) {
+  const guessId = !skipSubscription && typeof tokenUser?.bakery_id === 'string'
+    ? tokenUser.bakery_id
+    : null
+
+  const [user, prefetched] = await Promise.all([
+    resolveSession(tokenUser),
+    // A failure here is not fatal — the authoritative call below still runs.
+    guessId ? checkBakeryAccess(guessId).catch(() => null) : Promise.resolve(null),
+  ])
+
+  const access = async () => {
+    if (guessId && prefetched && guessId === user.bakery_id) return prefetched
+    return checkBakeryAccess(user.bakery_id)
+  }
+
+  return { user, access }
+}
+
 export const isSuperAdmin = (user: any) => user?.role === 'super_admin'
 
 export const requireAuth = async (
@@ -148,8 +181,9 @@ export const requireAuth = async (
   if (!tokenUser) { res.status(401).json({ error: 'Unauthorized' }); return null }
 
   let user: any
+  let getAccess: () => Promise<{ allowed: boolean; status: string }>
   try {
-    user = await resolveSession(tokenUser)
+    ({ user, access: getAccess } = await resolveSessionWithAccess(tokenUser, opts?.skipSubscription))
   } catch {
     res.status(503).json({ error: 'Service unavailable. Please try again.' })
     return null
@@ -160,7 +194,7 @@ export const requireAuth = async (
   }
 
   if (user.bakery_id && !isSuperAdmin(user) && !opts?.skipSubscription) {
-    const access = await checkBakeryAccess(user.bakery_id)
+    const access = await getAccess()
     if (!access.allowed) {
       res.status(402).json({
         error: 'subscription_expired',
@@ -225,8 +259,9 @@ export async function requirePage(
   if (!tokenUser) return redirectTo(loginTo)
 
   let user: any
+  let getAccess: () => Promise<{ allowed: boolean }>
   try {
-    user = await resolveSession(tokenUser)
+    ({ user, access: getAccess } = await resolveSessionWithAccess(tokenUser, opts.skipSubscription))
   } catch {
     // The database is unreachable. Refuse rather than serve data to a session
     // we cannot verify.
@@ -245,7 +280,7 @@ export async function requirePage(
   }
 
   if (user.bakery_id && !opts.skipSubscription) {
-    const access = await checkBakeryAccess(user.bakery_id)
+    const access = await getAccess()
     if (!access.allowed) return redirectTo('/billing')
   }
 
