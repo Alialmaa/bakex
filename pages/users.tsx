@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import { supabaseAdmin } from '../lib/supabase'
 import Layout from '../components/Layout'
+import { MetricCard, Icons, EditIcon, TrashIcon } from '../components/Metric'
 import { T, ROLE_CONFIG } from '../lib/translations'
 import { useLang } from '../lib/useLang'
 
@@ -84,30 +85,53 @@ export default function UsersPage({ user, initialUsers }: any) {
     <Layout user={user} lang={lang} setLang={setLang}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+        {/* Summary */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+          <MetricCard
+            label={lang === 'ar' ? 'الحسابات النشطة' : 'Active Accounts'}
+            value={activeUsers.length}
+            sub={lang === 'ar' ? 'مستخدم لديه صلاحية دخول' : 'users with access'}
+            icon={Icons.users} tone="green"
+          />
+          <MetricCard
+            label={lang === 'ar' ? 'طلبات معلّقة' : 'Pending Requests'}
+            value={pendingUsers.length}
+            sub={lang === 'ar' ? 'بانتظار الموافقة' : 'awaiting approval'}
+            icon={Icons.clock} tone="amber"
+            valueColor={pendingUsers.length ? '#d97706' : undefined}
+          />
+          <MetricCard
+            label={lang === 'ar' ? 'المديرون' : 'Administrators'}
+            value={activeUsers.filter(u => u.role === 'admin' || u.role === 'manager').length}
+            sub={lang === 'ar' ? 'صلاحيات إدارية' : 'with admin rights'}
+            icon={Icons.shield} tone="violet"
+          />
+        </div>
+
         {/* Pending requests */}
         {pendingUsers.length > 0 && (
-          <div className="card" style={{ borderColor: '#EF9F27', borderWidth: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ background: '#FAEEDA', color: '#854F0B', padding: '2px 10px', borderRadius: 20, fontSize: 12 }}>
+          <div className="card" style={{ borderColor: '#fde68a' }}>
+            <div className="card-title" style={{ marginBottom: 12 }}>
+              <span style={{ background: '#fffbeb', color: '#92400e', padding: '2px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
                 {pendingUsers.length}
               </span>
               {lang === 'ar' ? 'طلبات إنشاء الحسابات المعلقة' : 'Pending Account Requests'}
             </div>
             {pendingUsers.map(u => (
-              <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '34px 1fr auto', gap: 10, alignItems: 'center', padding: '10px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
-                <div className="avatar" style={{ width: 34, height: 34, fontSize: 13, background: '#FAEEDA', color: '#854F0B' }}>
+              <div key={u.id} className="trow" style={{ gridTemplateColumns: '34px 1fr auto', gap: 10, margin: '0 -18px', paddingInline: 18 }}>
+                <div className="avatar" style={{ width: 34, height: 34, fontSize: 13, background: '#fffbeb', color: '#92400e' }}>
                   {u.name?.charAt(0)}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 500 }}>{u.name}</div>
-                  <div style={{ fontSize: 11, color: '#888' }}>@{u.username}</div>
+                  <div style={{ fontWeight: 600 }}>{u.name}</div>
+                  <div style={{ fontSize: 11.5, color: '#9ca3af' }}>@{u.username}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => approve(u)} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 12 }}>
-                    ✓ {lang === 'ar' ? 'موافقة' : 'Approve'}
+                    {lang === 'ar' ? 'موافقة' : 'Approve'}
                   </button>
                   <button onClick={() => reject(u)} className="btn btn-danger" style={{ padding: '6px 12px', fontSize: 12 }}>
-                    ✗ {lang === 'ar' ? 'رفض' : 'Reject'}
+                    {lang === 'ar' ? 'رفض' : 'Reject'}
                   </button>
                 </div>
               </div>
@@ -117,16 +141,16 @@ export default function UsersPage({ user, initialUsers }: any) {
 
         {/* Edit modal */}
         {editing && (
-          <div className="card" style={{ border: '2px solid #1D9E75' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div style={{ fontSize: 14, fontWeight: 500 }}>
+          <div className="card" style={{ border: '1.5px solid #16a679' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div className="card-title">
                 {lang === 'ar' ? 'تعديل صلاحيات' : 'Edit permissions'}: {editing.name}
               </div>
-              <button onClick={() => setEditing(null)} style={{ background:'none', border:'none', cursor:'pointer', fontSize: 20, color: '#888' }}>×</button>
+              <button onClick={() => setEditing(null)} style={{ background:'none', border:'none', cursor:'pointer', fontSize: 22, color: '#9ca3af', lineHeight: 1 }}>×</button>
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 7 }}>{lang === 'ar' ? 'الدور' : 'Role'}</div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>{lang === 'ar' ? 'الدور' : 'Role'}</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {ROLES.map(r => {
                   const rc = ROLE_CONFIG[r]; const sel = r === editRole
@@ -140,7 +164,7 @@ export default function UsersPage({ user, initialUsers }: any) {
             </div>
 
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 8 }}>{lang === 'ar' ? 'الصلاحيات' : 'Permissions'}</div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>{lang === 'ar' ? 'الصلاحيات' : 'Permissions'}</div>
               {Object.entries(PERM_LABELS).map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
                   <span>{v[lang]}</span>
@@ -156,34 +180,37 @@ export default function UsersPage({ user, initialUsers }: any) {
         )}
 
         {/* Active users */}
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '34px 1fr auto auto auto', gap: 10, padding: '10px 16px', borderBottom: '0.5px solid #d4d4d4', fontSize: 11, color: '#888', fontWeight: 500 }}>
+        <div className="tbl">
+          <div className="thead" style={{ gridTemplateColumns: '34px 1fr auto 64px', gap: 10 }}>
             <span></span>
             <span>{lang === 'ar' ? 'المستخدم' : 'User'}</span>
             <span>{lang === 'ar' ? 'الدور' : 'Role'}</span>
             <span></span>
-            <span></span>
           </div>
-          <div style={{ padding: '0 16px' }}>
-            {activeUsers.map(u => {
-              const rc = ROLE_CONFIG[u.role as keyof typeof ROLE_CONFIG]
-              const permCount = Object.values(u.perms || {}).filter(Boolean).length
-              return (
-                <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '34px 1fr auto auto auto', gap: 10, alignItems: 'center', padding: '12px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
-                  <div className="avatar" style={{ width: 34, height: 34, fontSize: 13, background: rc?.bg, color: rc?.color }}>
-                    {u.name?.charAt(0)}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 500 }}>{u.name}</div>
-                    <div style={{ fontSize: 11, color: '#888' }}>@{u.username} · {permCount} {lang === 'ar' ? 'صلاحية' : 'permissions'}</div>
-                  </div>
-                  <span className="tag" style={{ background: rc?.bg, color: rc?.color }}>{ROLE_LABELS[u.role]?.[lang]}</span>
-                  <button onClick={() => startEdit(u)} disabled={u.role === 'admin'} style={{ background: 'none', border: 'none', cursor: u.role === 'admin' ? 'not-allowed' : 'pointer', color: '#1D9E75', opacity: u.role === 'admin' ? 0.3 : 1, fontSize: 14, padding: 4 }}>✏️</button>
-                  <button onClick={() => deleteUser(u.id)} disabled={u.role === 'admin'} style={{ background: 'none', border: 'none', cursor: u.role === 'admin' ? 'not-allowed' : 'pointer', color: '#E24B4A', opacity: u.role === 'admin' ? 0.3 : 1, fontSize: 16, padding: 4 }}>🗑</button>
+          {activeUsers.length === 0 ? (
+            <div className="tbl-empty">{lang === 'ar' ? 'لا توجد حسابات نشطة' : 'No active accounts'}</div>
+          ) : activeUsers.map(u => {
+            const rc = ROLE_CONFIG[u.role as keyof typeof ROLE_CONFIG]
+            const permCount = Object.values(u.perms || {}).filter(Boolean).length
+            // The API refuses both, so do not present them as available.
+            const locked = u.role === 'admin' || u.id === user.id
+            return (
+              <div key={u.id} className="trow" style={{ gridTemplateColumns: '34px 1fr auto 64px', gap: 10 }}>
+                <div className="avatar" style={{ width: 34, height: 34, fontSize: 13, background: rc?.bg, color: rc?.color }}>
+                  {u.name?.charAt(0)}
                 </div>
-              )
-            })}
-          </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600 }}>{u.name}</div>
+                  <div style={{ fontSize: 11.5, color: '#9ca3af' }}>@{u.username} · {permCount} {lang === 'ar' ? 'صلاحية' : 'permissions'}</div>
+                </div>
+                <span className="tag" style={{ background: rc?.bg, color: rc?.color }}>{ROLE_LABELS[u.role]?.[lang]}</span>
+                <div style={{ display: 'flex', gap: 2 }}>
+                  <button className="ibtn ibtn-edit" onClick={() => startEdit(u)} disabled={locked} title={lang === 'ar' ? 'تعديل' : 'Edit'}><EditIcon /></button>
+                  <button className="ibtn ibtn-del" onClick={() => deleteUser(u.id)} disabled={locked} title={lang === 'ar' ? 'حذف' : 'Delete'}><TrashIcon /></button>
+                </div>
+              </div>
+            )
+          })}
         </div>
 
       </div>
@@ -192,9 +219,9 @@ export default function UsersPage({ user, initialUsers }: any) {
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.users) return { redirect: { destination: '/403', permanent: false } }
+  const guard = await requirePage(req as any, { anyPerm: ['users'] })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
   const bid = user.bakery_id
   const { data } = bid
     ? await supabaseAdmin.from('users').select('id,name,username,role,perms,status,created_at').eq('bakery_id', bid).order('created_at')

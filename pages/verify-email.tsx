@@ -11,7 +11,7 @@ export default function VerifyEmailPage() {
   const isInvalid = error === 'invalid'
 
   return (
-    <div dir="rtl" style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    <div dir="rtl" style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'var(--font-ui)' }}>
       <div style={{ width: 380 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, background: GREEN, borderRadius: 14, marginBottom: 12, fontSize: 24 }}>🍞</div>

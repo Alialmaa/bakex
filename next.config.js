@@ -19,12 +19,19 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              // 'unsafe-eval' is not needed by the app; dropping it removes the
+              // easiest path from any future injection to running code.
+              // 'unsafe-inline' stays because Next.js emits inline bootstrap
+              // scripts — replacing it needs a per-request nonce.
+              "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
               `connect-src 'self' ${supabaseOrigin}`,
               "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "object-src 'none'",
             ].join('; '),
           },
         ],

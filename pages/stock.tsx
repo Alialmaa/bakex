@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import { supabaseAdmin } from '../lib/supabase'
 import Layout from '../components/Layout'
+import { MetricCard, Icons, EditIcon, TrashIcon } from '../components/Metric'
 import { T } from '../lib/translations'
 import { useLang } from '../lib/useLang'
+
+const COLS = '1.8fr 90px 70px 120px 90px 80px 74px'
 
 export default function StockPage({ user, initialStock }: any) {
   const { lang, setLang } = useLang()
@@ -117,17 +120,33 @@ export default function StockPage({ user, initialStock }: any) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
         {/* Summary */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
-          <div className="metric"><div className="metric-label">{lang === 'ar' ? 'الأصناف' : 'Items'}</div><div className="metric-value">{stock.length}</div></div>
-          <div className="metric"><div className="metric-label">{lang === 'ar' ? 'قيمة المخزون' : 'Stock Value'}</div><div className="metric-value" style={{ fontSize: 16 }}>{totalValue.toFixed(0)} <span style={{ fontSize: 12, fontWeight: 400 }}>{t.currency}</span></div></div>
-          <div style={{ background: lowCount ? '#FAEEDA' : '#f5f5f3', borderRadius: 8, padding: '12px 14px' }}>
-            <div className="metric-label" style={{ color: lowCount ? '#854F0B' : '' }}>{t.stock.low}</div>
-            <div className="metric-value" style={{ color: lowCount ? '#854F0B' : '' }}>{lowCount}</div>
-          </div>
-          <div style={{ background: emptyCount ? '#FCEBEB' : '#f5f5f3', borderRadius: 8, padding: '12px 14px' }}>
-            <div className="metric-label" style={{ color: emptyCount ? '#A32D2D' : '' }}>{t.stock.empty}</div>
-            <div className="metric-value" style={{ color: emptyCount ? '#A32D2D' : '' }}>{emptyCount}</div>
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <MetricCard
+            label={lang === 'ar' ? 'الأصناف' : 'Items'}
+            value={stock.length}
+            sub={lang === 'ar' ? 'مادة خام مسجّلة' : 'raw materials tracked'}
+            icon={Icons.box} tone="blue"
+          />
+          <MetricCard
+            label={lang === 'ar' ? 'قيمة المخزون' : 'Stock Value'}
+            value={totalValue.toFixed(0)} unit={t.currency}
+            sub={lang === 'ar' ? 'القيمة الحالية' : 'current valuation'}
+            icon={Icons.wallet} tone="green"
+          />
+          <MetricCard
+            label={t.stock.low}
+            value={lowCount}
+            sub={lang === 'ar' ? 'تحت الحد الأدنى' : 'below minimum'}
+            icon={Icons.alert} tone="amber"
+            valueColor={lowCount ? '#d97706' : undefined}
+          />
+          <MetricCard
+            label={t.stock.empty}
+            value={emptyCount}
+            sub={lang === 'ar' ? 'نفدت الكمية' : 'out of stock'}
+            icon={Icons.ban} tone="red"
+            valueColor={emptyCount ? '#dc2626' : undefined}
+          />
         </div>
 
         {/* Edit Modal */}
@@ -141,7 +160,7 @@ export default function StockPage({ user, initialStock }: any) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 5 }}>{lang === 'ar' ? `الكمية (${editItem.unit})` : `Qty (${editItem.unit})`}</div>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>{lang === 'ar' ? `الكمية (${editItem.unit})` : `Qty (${editItem.unit})`}</div>
                   <input
                     type="number"
                     value={editForm.qty}
@@ -152,7 +171,7 @@ export default function StockPage({ user, initialStock }: any) {
                   />
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 5 }}>{lang === 'ar' ? `الحد الأدنى (${editItem.unit})` : `Min qty (${editItem.unit})`}</div>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>{lang === 'ar' ? `الحد الأدنى (${editItem.unit})` : `Min qty (${editItem.unit})`}</div>
                   <input
                     type="number"
                     value={editForm.min_qty}
@@ -164,7 +183,7 @@ export default function StockPage({ user, initialStock }: any) {
               </div>
 
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 8 }}>{lang === 'ar' ? 'السعر' : 'Price'}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>{lang === 'ar' ? 'السعر' : 'Price'}</div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                   <button onClick={() => setUsePackCalc(false)} style={{ padding: '5px 12px', fontSize: 12, borderRadius: 6, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: !usePackCalc ? '#E1F5EE' : 'transparent', color: !usePackCalc ? '#085041' : '#888', borderColor: !usePackCalc ? '#1D9E75' : '#d4d4d4' }}>
                     {lang === 'ar' ? 'أدخل السعر مباشرة' : 'Direct price'}
@@ -217,9 +236,9 @@ export default function StockPage({ user, initialStock }: any) {
         )}
 
         {/* Stock table */}
-        <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-          <div style={{ minWidth: 600 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 90px 70px 120px 90px 80px 80px', gap: 8, padding: '8px 16px', borderBottom: '0.5px solid #d4d4d4', fontSize: 11, color: '#888', fontWeight: 500 }}>
+        <div className="tbl" style={{ overflowX: 'auto' }}>
+          <div style={{ minWidth: 640 }}>
+            <div className="thead" style={{ gridTemplateColumns: COLS, gap: 8 }}>
               <span>{t.stock.material}</span>
               <span>{t.stock.qty}</span>
               <span>{t.stock.unit}</span>
@@ -228,33 +247,33 @@ export default function StockPage({ user, initialStock }: any) {
               <span>{t.stock.status}</span>
               <span></span>
             </div>
-            <div style={{ padding: '0 16px' }}>
-              {stock.map(item => {
-                const st = getStatus(item)
-                return (
-                  <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1.8fr 90px 70px 120px 90px 80px 80px', gap: 8, alignItems: 'center', padding: '10px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
-                    <span style={{ fontWeight: 500 }}>{item.name}</span>
-                    <span style={{ fontWeight: 500, color: item.qty <= 0 ? '#A32D2D' : '#333' }}>{item.qty}</span>
-                    <span style={{ color: '#888', fontSize: 12 }}>{item.unit}</span>
-                    <div>
-                      <div style={{ fontSize: 12 }}>{(item.price_per_unit || 0).toFixed(4)} {t.currency}</div>
-                      <div style={{ fontSize: 9, color: '#aaa' }}>{t.currency}/{item.unit}</div>
-                    </div>
-                    <span style={{ color: '#888', fontSize: 11 }}>{((item.qty || 0) * (item.price_per_unit || 0)).toFixed(1)} {t.currency}</span>
-                    <span className={`tag ${st.cls}`} style={{ fontSize: 10 }}>{st.label}</span>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button onClick={() => openEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1D9E75', fontSize: 14, padding: 4 }}>✏️</button>
-                      <button onClick={() => deleteMat(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E24B4A', fontSize: 14, padding: 4 }}>🗑</button>
-                    </div>
+            {stock.length === 0 ? (
+              <div className="tbl-empty">{lang === 'ar' ? 'لا توجد مواد خام بعد' : 'No materials yet'}</div>
+            ) : stock.map(item => {
+              const st = getStatus(item)
+              return (
+                <div key={item.id} className="trow" style={{ gridTemplateColumns: COLS, gap: 8 }}>
+                  <span style={{ fontWeight: 600 }}>{item.name}</span>
+                  <span className="num" style={{ fontWeight: 600, color: item.qty <= 0 ? '#dc2626' : '#111827' }}>{item.qty}</span>
+                  <span style={{ color: '#9ca3af', fontSize: 12.5 }}>{item.unit}</span>
+                  <div>
+                    <div className="num" style={{ fontSize: 12.5 }}>{(item.price_per_unit || 0).toFixed(4)}</div>
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>{t.currency}/{item.unit}</div>
                   </div>
-                )
-              })}
-            </div>
+                  <span className="num" style={{ color: '#6b7280', fontSize: 12.5 }}>{((item.qty || 0) * (item.price_per_unit || 0)).toFixed(1)}</span>
+                  <span className={`tag ${st.cls}`} style={{ fontSize: 10.5 }}>{st.label}</span>
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    <button className="ibtn ibtn-edit" onClick={() => openEdit(item)} title={lang === 'ar' ? 'تعديل' : 'Edit'}><EditIcon /></button>
+                    <button className="ibtn ibtn-del" onClick={() => deleteMat(item.id)} title={lang === 'ar' ? 'حذف' : 'Delete'}><TrashIcon /></button>
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
           {/* Add material */}
-          <div style={{ padding: '14px 16px', borderTop: '0.5px solid #e5e5e5', background: '#fafaf8' }}>
-            <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 10, color: '#555' }}>
+          <div style={{ padding: '16px', borderTop: '1px solid #e5e7eb', background: '#fcfcfd' }}>
+            <div className="card-title" style={{ fontSize: 12.5, marginBottom: 12 }}>
               {lang === 'ar' ? '+ إضافة مادة جديدة' : '+ Add new material'}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 90px 80px', gap: 8, marginBottom: 10 }}>
@@ -327,9 +346,9 @@ export default function StockPage({ user, initialStock }: any) {
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.stock) return { redirect: { destination: '/403', permanent: false } }
+  const guard = await requirePage(req as any, { anyPerm: ['stock'] })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
   const bid = user.bakery_id
   const { data } = bid
     ? await supabaseAdmin.from('stock').select('*').eq('bakery_id', bid).order('name')

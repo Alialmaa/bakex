@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import { supabaseAdmin } from '../lib/supabase'
 import Layout from '../components/Layout'
+import { MetricCard, Icons, EditIcon, TrashIcon } from '../components/Metric'
 import { T } from '../lib/translations'
 import { useLang } from '../lib/useLang'
+import { fmtDateLong, fmtTime, fromDayString } from '../lib/datetime'
 
 export default function ProducePage({ user, initialRecipes, initialStock, initialLog, initialMonthDates }: any) {
   const { lang, setLang } = useLang()
@@ -143,12 +145,12 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
         {/* Edit modal */}
         {editLog && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-            <div className="card" style={{ width: 360 }} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 14 }}>{lang === 'ar' ? 'تعديل إنتاج' : 'Edit production'}</div>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>{editLog.recipe_name}</div>
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: '#666', marginBottom: 5 }}>{lang === 'ar' ? `الكمية (${editLog.output_unit})` : `Qty (${editLog.output_unit})`}</div>
-                <input type="number" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ fontSize: 16 }} autoFocus />
+            <div className="modal-box" style={{ width: 360 }} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+              <div className="card-title" style={{ marginBottom: 6 }}>{lang === 'ar' ? 'تعديل إنتاج' : 'Edit production'}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 14 }}>{editLog.recipe_name}</div>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11.5, color: '#6b7280', fontWeight: 600, marginBottom: 6 }}>{lang === 'ar' ? `الكمية (${editLog.output_unit})` : `Qty (${editLog.output_unit})`}</div>
+                <input type="number" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ fontSize: 16, fontWeight: 600 }} autoFocus />
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center', padding: '10px 0' }} onClick={saveEditLog}>
@@ -162,14 +164,48 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
           </div>
         )}
 
+        {/* Summary */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+          <MetricCard
+            label={lang === 'ar' ? 'إنتاج اليوم' : "Today's Output"}
+            value={log.reduce((s, l) => s + (l.output_qty || 0), 0)}
+            sub={lang === 'ar' ? `${log.length} دفعة مسجّلة` : `${log.length} batches logged`}
+            icon={Icons.factory} tone="green"
+          />
+          <MetricCard
+            label={lang === 'ar' ? 'وصفات جاهزة' : 'Ready to Produce'}
+            value={recipes.filter(r => maxBatches(r) > 0).length}
+            sub={lang === 'ar' ? `من أصل ${recipes.length} وصفة` : `of ${recipes.length} recipes`}
+            icon={Icons.chef} tone="blue"
+          />
+          <MetricCard
+            label={lang === 'ar' ? 'موقوفة لنقص المواد' : 'Blocked by Stock'}
+            value={recipes.filter(r => maxBatches(r) === 0).length}
+            sub={lang === 'ar' ? 'المخزون لا يكفي' : 'insufficient materials'}
+            icon={Icons.alert} tone="amber"
+            valueColor={recipes.some(r => maxBatches(r) === 0) ? '#d97706' : undefined}
+          />
+        </div>
+
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setTab('produce')} style={{ padding: '8px 18px', fontSize: 13, borderRadius: 8, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: tab === 'produce' ? '#1D9E75' : '#fff', color: tab === 'produce' ? '#fff' : '#888', borderColor: tab === 'produce' ? '#1D9E75' : '#d4d4d4', fontWeight: tab === 'produce' ? 500 : 400 }}>
-            🍞 {lang === 'ar' ? 'إنتاج' : 'Produce'}
-          </button>
-          <button onClick={() => setTab('log')} style={{ padding: '8px 18px', fontSize: 13, borderRadius: 8, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: tab === 'log' ? '#1D9E75' : '#fff', color: tab === 'log' ? '#fff' : '#888', borderColor: tab === 'log' ? '#1D9E75' : '#d4d4d4', fontWeight: tab === 'log' ? 500 : 400 }}>
-            📋 {lang === 'ar' ? 'السجل' : 'Log'}
-          </button>
+        <div style={{ display: 'flex', gap: 7 }}>
+          {([
+            { k: 'produce' as const, icon: Icons.factory, label: lang === 'ar' ? 'إنتاج' : 'Produce' },
+            { k: 'log' as const, icon: Icons.calendar, label: lang === 'ar' ? 'السجل' : 'Log' },
+          ]).map(({ k, icon, label }) => {
+            const on = tab === k
+            return (
+              <button key={k} onClick={() => setTab(k)} style={{
+                padding: '8px 18px', fontSize: 13, borderRadius: 8, border: '1px solid', cursor: 'pointer',
+                fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 7, transition: 'all 0.15s',
+                background: on ? '#16a679' : '#fff', color: on ? '#fff' : '#6b7280',
+                borderColor: on ? '#16a679' : '#e5e7eb', fontWeight: on ? 600 : 500,
+                boxShadow: on ? '0 1px 3px rgba(22,166,121,0.25)' : '0 1px 2px rgba(0,0,0,0.05)',
+              }}>
+                <span className="ico-sm" style={{ opacity: on ? 1 : 0.6 }}>{icon}</span>{label}
+              </button>
+            )
+          })}
         </div>
 
         {tab === 'produce' && (
@@ -181,14 +217,14 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
               const units = r.units_per_batch || r.output_qty || 1
               return (
                 <div key={r.id} className="card">
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 500 }}>{r.name}</div>
-                      <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
-                        {r.batch_unit || 'صينية'} ← {units} {r.output_unit}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.2px' }}>{r.name}</div>
+                      <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 3 }}>
+                        {r.batch_unit || 'صينية'} <span style={{ color: '#d1d5db' }}>→</span> <span className="num">{units}</span> {r.output_unit}
                       </div>
                     </div>
-                    <span className="tag tag-gray" style={{ fontSize: 11, marginRight: 'auto', marginLeft: 'auto' }}>{uc.toFixed(3)} {t.currency}/{r.output_unit}</span>
+                    <span className="tag tag-gray num" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{uc.toFixed(3)} {t.currency}/{r.output_unit}</span>
                   </div>
 
                   {/* Max batches indicator */}
@@ -196,18 +232,19 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
                     const max = maxBatches(r)
                     const lim = limitingIngredient(r)
                     const maxUnits = max * units
-                    const color = max === 0 ? '#A32D2D' : max < 3 ? '#854F0B' : '#3B6D11'
-                    const bg = max === 0 ? '#FCEBEB' : max < 3 ? '#FAEEDA' : '#E1F5EE'
+                    const color = max === 0 ? '#dc2626' : max < 3 ? '#d97706' : '#059669'
+                    const bg = max === 0 ? '#fef2f2' : max < 3 ? '#fffbeb' : '#ecfdf5'
+                    const bd = max === 0 ? '#fecaca' : max < 3 ? '#fde68a' : '#a7f3d0'
                     return (
-                      <div style={{ background: bg, borderRadius: 8, padding: '8px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontSize: 11, color, fontWeight: 500 }}>
+                      <div style={{ background: bg, border: `1px solid ${bd}`, borderRadius: 10, padding: '10px 13px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 11.5, color, fontWeight: 600 }}>
                             {max === 0
-                              ? (lang === 'ar' ? '⚠ المخزون لا يكفي' : '⚠ Insufficient stock')
-                              : (lang === 'ar' ? `✓ تقدر تنتج ${max} ${r.batch_unit || 'صينية'}` : `✓ Can produce ${max} batches`)}
+                              ? (lang === 'ar' ? 'المخزون لا يكفي' : 'Insufficient stock')
+                              : (lang === 'ar' ? `تقدر تنتج ${max} ${r.batch_unit || 'صينية'}` : `Can produce ${max} batches`)}
                           </div>
                           {max > 0 && (
-                            <div style={{ fontSize: 10, color, marginTop: 2 }}>
+                            <div className="num" style={{ fontSize: 10.5, color, opacity: 0.8, marginTop: 3 }}>
                               = {maxUnits} {r.output_unit}
                               {lim && ` · ${lang === 'ar' ? 'المحدد:' : 'Limited by:'} ${lim}`}
                             </div>
@@ -216,7 +253,7 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
                         {max > 0 && (
                           <button
                             onClick={() => setBatches({ ...batches, [r.id]: max })}
-                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '0.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', color, borderColor: color }}
+                            style={{ fontSize: 11, fontWeight: 600, padding: '5px 11px', borderRadius: 6, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit', background: '#fff', color, borderColor: bd, whiteSpace: 'nowrap' }}
                           >
                             {lang === 'ar' ? 'استخدم الكل' : 'Use max'}
                           </button>
@@ -231,23 +268,23 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
                       const needed = ing.amount * b
                       const has = m && m.qty >= needed
                       return (
-                        <span key={ing.material} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: has ? '#f5f5f3' : '#FCEBEB', color: has ? '#888' : '#A32D2D' }}>
+                        <span key={ing.material} className="num" style={{ fontSize: 11, fontWeight: 500, padding: '3px 9px', borderRadius: 20, background: has ? '#f3f4f6' : '#fef2f2', color: has ? '#6b7280' : '#991b1b' }}>
                           {ing.material}: {needed.toFixed(2)} {m?.unit || ''}
                         </span>
                       )
                     })}
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 12, color: '#666' }}>{lang === 'ar' ? 'عدد الصواني:' : 'Batches:'}</span>
-                    <button onClick={() => setBatches({ ...batches, [r.id]: Math.max(1, b - 1) })} style={{ width: 26, height: 26, borderRadius: 6, border: '0.5px solid #d4d4d4', background: '#fff', cursor: 'pointer', fontSize: 14 }}>−</button>
-                    <input type="number" value={b} min={1} onChange={e => setBatches({ ...batches, [r.id]: Math.max(1, parseInt(e.target.value) || 1) })} style={{ width: 50, textAlign: 'center', padding: '4px 6px' }} />
-                    <button onClick={() => setBatches({ ...batches, [r.id]: b + 1 })} style={{ width: 26, height: 26, borderRadius: 6, border: '0.5px solid #d4d4d4', background: '#fff', cursor: 'pointer', fontSize: 14 }}>+</button>
-                    <span style={{ fontSize: 11, color: '#1D9E75', fontWeight: 500 }}>= {units * b} {r.output_unit}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>{lang === 'ar' ? 'عدد الصواني:' : 'Batches:'}</span>
+                    <button onClick={() => setBatches({ ...batches, [r.id]: Math.max(1, b - 1) })} style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 15, color: '#6b7280', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>−</button>
+                    <input type="number" value={b} min={1} onChange={e => setBatches({ ...batches, [r.id]: Math.max(1, parseInt(e.target.value) || 1) })} style={{ width: 54, textAlign: 'center', padding: '5px 6px', fontWeight: 600 }} />
+                    <button onClick={() => setBatches({ ...batches, [r.id]: b + 1 })} style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 15, color: '#6b7280', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>+</button>
+                    <span className="num" style={{ fontSize: 11.5, color: '#059669', fontWeight: 600 }}>= {units * b} {r.output_unit}</span>
                   </div>
 
-                  <button onClick={() => produce(r)} disabled={!ok || loading === r.id} style={{ width: '100%', padding: '9px 14px', fontSize: 13, borderRadius: 8, border: 'none', cursor: ok ? 'pointer' : 'not-allowed', background: ok ? '#1D9E75' : '#f5f5f3', color: ok ? '#fff' : '#aaa', fontFamily: 'inherit', fontWeight: 500 }}>
-                    {loading === r.id ? '...' : ok ? `▶ ${lang === 'ar' ? 'أنتج الآن' : 'Produce'}` : (lang === 'ar' ? 'مواد غير كافية' : 'Insufficient')}
+                  <button onClick={() => produce(r)} disabled={!ok || loading === r.id} style={{ width: '100%', padding: '10px 14px', fontSize: 13, borderRadius: 8, border: 'none', cursor: ok ? 'pointer' : 'not-allowed', background: ok ? '#16a679' : '#f3f4f6', color: ok ? '#fff' : '#9ca3af', fontFamily: 'inherit', fontWeight: 600, boxShadow: ok ? '0 1px 3px rgba(22,166,121,0.25)' : 'none', transition: 'all 0.15s' }}>
+                    {loading === r.id ? '...' : ok ? (lang === 'ar' ? 'أنتج الآن' : 'Produce now') : (lang === 'ar' ? 'مواد غير كافية' : 'Insufficient materials')}
                   </button>
                 </div>
               )
@@ -260,12 +297,12 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
 
             {/* Calendar */}
             <div className="card">
-              <div style={{ fontSize: 13, fontWeight: 500, textAlign: 'center', marginBottom: 10 }}>
+              <div className="num" style={{ fontSize: 13.5, fontWeight: 700, textAlign: 'center', marginBottom: 14, letterSpacing: '-0.1px' }}>
                 {monthNames[lang][month]} {year}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 6 }}>
                 {dayNames[lang].map(d => (
-                  <div key={d} style={{ textAlign: 'center', fontSize: 10, color: '#888', padding: '4px 0' }}>{d}</div>
+                  <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: '#9ca3af', padding: '4px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{d}</div>
                 ))}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
@@ -281,60 +318,65 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
                     <button
                       key={day}
                       onClick={() => setSelectedDate(dateStr)}
+                      className="num"
                       style={{
-                        padding: '6px 0', fontSize: 12, borderRadius: 6, border: 'none', cursor: 'pointer',
-                        background: isSelected ? '#1D9E75' : isToday ? '#E1F5EE' : 'transparent',
-                        color: isSelected ? '#fff' : isToday ? '#085041' : '#333',
-                        fontWeight: isSelected || isToday ? 600 : 400,
+                        padding: '7px 0', fontSize: 12, borderRadius: 7, border: 'none', cursor: 'pointer',
+                        background: isSelected ? '#16a679' : isToday ? '#ecfdf5' : 'transparent',
+                        color: isSelected ? '#fff' : isToday ? '#065f46' : '#374151',
+                        fontWeight: isSelected || isToday ? 700 : 500,
                         position: 'relative',
-                        fontFamily: 'inherit'
+                        fontFamily: 'inherit',
+                        transition: 'background 0.13s',
                       }}
                     >
                       {day}
                       {hasData && !isSelected && (
-                        <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#1D9E75' }} />
+                        <div style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#16a679' }} />
                       )}
                     </button>
                   )
                 })}
               </div>
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #e5e5e5', fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1D9E75' }} />
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #f1f5f9', fontSize: 11.5, color: '#9ca3af', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 7 }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a679', flexShrink: 0 }} />
                 {lang === 'ar' ? 'يوجد إنتاج' : 'Has production'}
               </div>
             </div>
 
             {/* Day log */}
             <div className="card">
-              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}>
-                📅 {new Date(selectedDate + 'T12:00:00').toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              <div className="card-title" style={{ marginBottom: 14 }}>
+                <span className="ico-sm" style={{ color: '#9ca3af' }}>{Icons.calendar}</span>
+                <span suppressHydrationWarning>{fmtDateLong(fromDayString(selectedDate), lang)}</span>
               </div>
               {loadingLog ? (
-                <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '20px 0' }}>...</div>
+                <div className="tbl-empty" style={{ padding: '24px 0' }}>...</div>
               ) : filteredLog.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '20px 0' }}>
+                <div className="tbl-empty" style={{ padding: '24px 0' }}>
                   {lang === 'ar' ? 'لا يوجد إنتاج في هذا اليوم' : 'No production on this day'}
                 </div>
               ) : (
                 <>
                   {filteredLog.map(l => (
-                    <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
-                      <div>
-                        <div style={{ fontWeight: 500 }}>{l.recipe_name}</div>
-                        <div style={{ fontSize: 11, color: '#888' }}>
-                          {new Date(l.created_at).toLocaleTimeString(lang === 'ar' ? 'ar' : 'en', { hour: '2-digit', minute: '2-digit' })}
+                    <div key={l.id} className="trow" style={{ gridTemplateColumns: '1fr auto', gap: 10, margin: '0 -18px', paddingInline: 18 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600 }}>{l.recipe_name}</div>
+                        <div className="num" style={{ fontSize: 11.5, color: '#9ca3af' }} suppressHydrationWarning>
+                          {fmtTime(l.created_at, lang)}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontWeight: 500, color: '#1D9E75', fontSize: 16 }}>{l.output_qty} {l.output_unit}</span>
-                        <button onClick={() => { setEditLog(l); setEditQty(String(l.output_qty)) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1D9E75', fontSize: 14, padding: 4 }}>✏️</button>
-                        <button onClick={() => deleteLog(l.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E24B4A', fontSize: 14, padding: 4 }}>🗑</button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="num" style={{ fontWeight: 700, color: '#059669', fontSize: 15 }}>{l.output_qty} <span style={{ fontSize: 11.5, color: '#9ca3af', fontWeight: 500 }}>{l.output_unit}</span></span>
+                        <div style={{ display: 'flex', gap: 2 }}>
+                          <button className="ibtn ibtn-edit" title={lang === 'ar' ? 'تعديل' : 'Edit'} onClick={() => { setEditLog(l); setEditQty(String(l.output_qty)) }}><EditIcon /></button>
+                          <button className="ibtn ibtn-del" title={lang === 'ar' ? 'حذف' : 'Delete'} onClick={() => deleteLog(l.id)}><TrashIcon /></button>
+                        </div>
                       </div>
                     </div>
                   ))}
-                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span style={{ color: '#888' }}>{lang === 'ar' ? 'إجمالي اليوم' : 'Day total'}</span>
-                    <span style={{ fontWeight: 500 }}>{filteredLog.reduce((s, l) => s + l.output_qty, 0)} {lang === 'ar' ? 'وحدة' : 'units'}</span>
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: '#9ca3af', fontWeight: 500 }}>{lang === 'ar' ? 'إجمالي اليوم' : 'Day total'}</span>
+                    <span className="num" style={{ fontWeight: 700 }}>{filteredLog.reduce((s, l) => s + l.output_qty, 0)} {lang === 'ar' ? 'وحدة' : 'units'}</span>
                   </div>
                 </>
               )}
@@ -349,9 +391,9 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.produce) return { redirect: { destination: '/403', permanent: false } }
+  const guard = await requirePage(req as any, { anyPerm: ['produce'] })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
 
   const today = new Date().toISOString().split('T')[0]
   const monthStart = new Date().toISOString().slice(0, 7) + '-01'

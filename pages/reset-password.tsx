@@ -14,7 +14,7 @@ export default function ResetPasswordPage() {
 
   const handleSubmit = async () => {
     setError('')
-    if (!password || password.length < 6) { setError('كلمة المرور يجب أن تكون ٦ أحرف على الأقل'); return }
+    if (!password || password.length < 6) { setError('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); return }
     if (password !== confirm) { setError('كلمة المرور وتأكيدها غير متطابقتين'); return }
     if (!token) { setError('رابط غير صالح'); return }
     setLoading(true)
@@ -30,7 +30,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div dir="rtl" style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    <div dir="rtl" style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'var(--font-ui)' }}>
       <div style={{ width: 380 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, background: GREEN, borderRadius: 14, marginBottom: 12, fontSize: 24 }}>🍞</div>
@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
                 <input
                   type="password" value={password} dir="ltr"
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="٦ أحرف على الأقل"
+                  placeholder="6 أحرف على الأقل"
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
                 />
               </div>

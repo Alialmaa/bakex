@@ -1,7 +1,10 @@
 import { supabaseAdmin } from '../supabase'
 
-export async function listSales(bakery_id: string | null, from?: string, to?: string) {
-  let query = supabaseAdmin.from('sales').select('*').order('created_at', { ascending: false })
+/** Rows are for display; totals should come from the aggregate helpers below. */
+const LIST_LIMIT = 500
+
+export async function listSales(bakery_id: string | null, from?: string, to?: string, limit = LIST_LIMIT) {
+  let query = supabaseAdmin.from('sales').select('*').order('created_at', { ascending: false }).limit(limit)
   if (bakery_id) query = query.eq('bakery_id', bakery_id)
   if (from) query = query.gte('created_at', from)
   if (to) query = query.lte('created_at', to)
@@ -10,11 +13,57 @@ export async function listSales(bakery_id: string | null, from?: string, to?: st
   return data
 }
 
-export async function createSales(bakery_id: string, entries: any[], sold_by: string, date?: string) {
+/** Total revenue for a period, summed in Postgres. */
+export async function getSalesRevenue(bakery_id: string, from: string, to?: string): Promise<number> {
+  const { data, error } = await supabaseAdmin.rpc('sales_revenue', {
+    p_bakery_id: bakery_id, p_from: from, p_to: to ?? null,
+  })
+  if (error) throw error
+  return Number(data) || 0
+}
+
+/** Quantity and revenue per recipe, grouped in Postgres. */
+export async function getSalesByRecipe(
+  bakery_id: string, from: string, to?: string
+): Promise<Map<string, { qty: number; revenue: number }>> {
+  const { data, error } = await supabaseAdmin.rpc('sales_by_recipe', {
+    p_bakery_id: bakery_id, p_from: from, p_to: to ?? null,
+  })
+  if (error) throw error
+  const map = new Map<string, { qty: number; revenue: number }>()
+  for (const row of (data as any[]) || []) {
+    if (!row.recipe_id) continue
+    map.set(row.recipe_id, { qty: Number(row.qty) || 0, revenue: Number(row.revenue) || 0 })
+  }
+  return map
+}
+
+export interface SaleEntry {
+  recipe_id: string
+  recipe_name?: string
+  qty: number
+  unit_price: number
+}
+
+export async function createSales(bakery_id: string, entries: SaleEntry[], sold_by: string, date?: string) {
   const created_at = date
     ? new Date(date + 'T12:00:00').toISOString()
     : new Date().toISOString()
-  const rows = entries.map((e: any) => ({ ...e, bakery_id, sold_by, created_at }))
+
+  // Each column is set explicitly. This used to spread the caller's object
+  // (`{ ...e }`), which handed the client a direct write into every column of
+  // the table — including `total`, the figure every financial report sums.
+  const rows = entries.map(e => ({
+    recipe_id: e.recipe_id,
+    recipe_name: typeof e.recipe_name === 'string' ? e.recipe_name.slice(0, 200) : null,
+    qty: e.qty,
+    unit_price: e.unit_price,
+    total: Math.round(e.qty * e.unit_price * 100) / 100,
+    bakery_id,
+    sold_by,
+    created_at,
+  }))
+
   const { data, error } = await supabaseAdmin
     .from('sales')
     .insert(rows)
@@ -36,18 +85,28 @@ export async function getSalesInRange(bakery_id: string, from: string, to?: stri
   return listSales(bakery_id, from, to)
 }
 
+/**
+ * Daily totals for the last 7 days.
+ *
+ * Previously this fetched every sale in the window and grouped them in JS —
+ * work that duplicated the month-to-date query the same page already ran.
+ */
 export async function getWeeklySales(bakery_id: string | null): Promise<{ day: string; total: number }[]> {
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date()
     d.setDate(d.getDate() - (6 - i))
     return d.toISOString().split('T')[0]
   })
-  const from = days[0]
-  const sales = await getSalesInRange(bakery_id, from)
-  const map: Record<string, number> = {}
-  for (const s of sales || []) {
-    const day = (s.created_at as string).split('T')[0]
-    map[day] = (map[day] || 0) + s.total
+  if (!bakery_id) return days.map(day => ({ day, total: 0 }))
+
+  const { data, error } = await supabaseAdmin.rpc('sales_daily_totals', {
+    p_bakery_id: bakery_id, p_from: days[0], p_to: days[6],
+  })
+  if (error) throw error
+
+  const byDay = new Map<string, number>()
+  for (const row of (data as any[]) || []) {
+    byDay.set(String(row.day).slice(0, 10), Number(row.total) || 0)
   }
-  return days.map(d => ({ day: d, total: map[d] || 0 }))
+  return days.map(day => ({ day, total: byDay.get(day) ?? 0 }))
 }

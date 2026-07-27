@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requirePerm } from '../../../lib/auth'
 import { listUsers, updateUser, deleteUser } from '../../../lib/db/users'
 import { logAudit } from '../../../lib/audit'
+import { apiError } from '../../../lib/apiError'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await requirePerm(req, res, 'users')
@@ -33,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? Object.fromEntries(ALLOWED_PERMS.filter(k => k in perms).map(k => [k, Boolean(perms[k])]))
         : undefined
 
-      await updateUser(id, bakery_id, { role: safeRole, perms: safePerms, status: safeStatus })
+      await updateUser(id, bakery_id, user.id, { role: safeRole, perms: safePerms, status: safeStatus })
 
       await logAudit({
         bakery_id, actor_id: user.id, actor_name: user.name,
@@ -47,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { id } = req.body
       if (typeof id !== 'string' || !id) return res.status(400).json({ error: 'id is required' })
 
-      await deleteUser(id, bakery_id)
+      await deleteUser(id, bakery_id, user.id)
 
       await logAudit({
         bakery_id, actor_id: user.id, actor_name: user.name,
@@ -58,7 +59,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     res.status(405).end()
   } catch (e: any) {
-    const status = e.message === 'Cannot delete admin' ? 403 : e.message === 'User not found' ? 404 : 500
-    res.status(status).json({ error: e.message })
+    if (e.message?.startsWith('Cannot ')) return res.status(403).json({ error: e.message })
+    if (e.message === 'User not found') return res.status(404).json({ error: e.message })
+    return apiError(res, e, 'users')
   }
 }

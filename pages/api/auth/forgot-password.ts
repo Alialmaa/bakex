@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabase'
 import { sendPasswordResetEmail } from '../../../lib/email'
+import { appUrl } from '../../../lib/appUrl'
+import { checkRateLimit, RATE_LIMITS } from '../../../lib/rateLimit'
+import { clientIp } from '../../../lib/clientIp'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -11,6 +14,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'البريد الإلكتروني غير صحيح' })
 
   const normalised = email.trim().toLowerCase()
+
+  // Unlimited before: every call sent a billable email, so anyone could fill a
+  // victim's inbox and burn the Resend quota that new customers need for their
+  // verification mail.
+  //
+  // A rejected request returns the same body as an unknown address. Answering
+  // 429 here would tell an attacker the address exists, which is exactly what
+  // the uniform response below is there to hide.
+  const ipLimit = await checkRateLimit(`pwreset:ip:${clientIp(req)}`, RATE_LIMITS.passwordReset)
+  const mailLimit = await checkRateLimit(`pwreset:mail:${normalised}`, RATE_LIMITS.passwordReset)
+  if (!ipLimit.allowed || !mailLimit.allowed) return res.status(200).json({ success: true })
 
   const { data: user } = await supabaseAdmin
     .from('users')
@@ -31,9 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (error) return res.status(500).json({ error: 'حدث خطأ، حاول مجدداً' })
 
-  const host = req.headers.host ?? 'bakexsystem.com'
-  const protocol = host.includes('localhost') ? 'http' : 'https'
-  const resetLink = `${protocol}://${host}/reset-password?token=${token}`
+  const resetLink = appUrl(`/reset-password?token=${token}`)
 
   try {
     await sendPasswordResetEmail(normalised, resetLink)

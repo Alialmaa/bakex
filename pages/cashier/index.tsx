@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../../lib/auth'
+import { requirePage, isRedirect } from '../../lib/auth'
 import { supabaseAdmin } from '../../lib/supabase'
+import { fmtDate, fmtTime } from '../../lib/datetime'
 
 interface CartItem { id: string; name: string; price: number; qty: number }
 interface Invoice {
@@ -111,7 +112,7 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
   const todayTotal = todayInvoices.reduce((s, inv) => s + Number(inv.total), 0)
 
   return (
-    <div dir="rtl" style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Inter', -apple-system, sans-serif", display: 'flex', flexDirection: 'column' }}>
+    <div dir="rtl" style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'var(--font-ui)', display: 'flex', flexDirection: 'column' }}>
 
       {/* Header */}
       <header style={{ background: '#1e1b4b', color: '#fff', height: 54, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', flexShrink: 0 }}>
@@ -147,7 +148,7 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 12, fontWeight: 500, color: '#e0e7ff' }}>{user?.name}</div>
-            <div style={{ fontSize: 10, color: '#6366f1' }}>{new Date().toLocaleDateString('ar-SA')}</div>
+            <div style={{ fontSize: 10, color: '#6366f1' }}>{fmtDate(new Date(), 'ar')}</div>
           </div>
           <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.1)' }} />
           <button onClick={() => window.location.href = '/dashboard'}
@@ -416,8 +417,8 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
                 <div style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, color: PURPLE_DARK }}>{inv.invoice_number}</div>
                 <div style={{ fontSize: 13, color: '#374151' }}>{inv.customer_name || <span style={{ color: '#cbd5e1' }}>—</span>}</div>
                 <div style={{ fontSize: 12, color: '#64748b' }}>
-                  {new Date(inv.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
-                  <div style={{ fontSize: 10, color: '#94a3b8' }}>{new Date(inv.created_at).toLocaleDateString('ar-SA')}</div>
+                  {fmtTime(inv.created_at, 'ar')}
+                  <div style={{ fontSize: 10, color: '#94a3b8' }}>{fmtDate(inv.created_at, 'ar')}</div>
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{Number(inv.total).toFixed(2)} <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 400 }}>ر.س</span></div>
                 <div>
@@ -492,11 +493,11 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginTop: 4 }}>
                   <span style={{ color: '#64748b' }}>التاريخ الميلادي:</span>
-                  <span style={{ fontWeight: 500 }}>{new Date(selectedInvoice.created_at).toLocaleDateString('ar-SA')}</span>
+                  <span style={{ fontWeight: 500 }}>{fmtDate(selectedInvoice.created_at, 'ar')}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginTop: 4 }}>
                   <span style={{ color: '#64748b' }}>الوقت:</span>
-                  <span style={{ fontWeight: 500 }}>{new Date(selectedInvoice.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span style={{ fontWeight: 500 }}>{fmtTime(selectedInvoice.created_at, 'ar')}</span>
                 </div>
                 {selectedInvoice.customer_name && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginTop: 4 }}>
@@ -561,8 +562,9 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/cashier/login', permanent: false } }
+  const guard = await requirePage(req as any, { loginTo: '/cashier/login' })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
 
   const bid = user.bakery_id
   const { data: products } = bid

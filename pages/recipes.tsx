@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import { supabaseAdmin } from '../lib/supabase'
 import Layout from '../components/Layout'
+import { MetricCard, Icons, EditIcon, TrashIcon } from '../components/Metric'
 import { T } from '../lib/translations'
 import { useLang } from '../lib/useLang'
+
+const COLS = '2fr 130px 90px 100px 100px 90px 64px'
 
 export default function RecipesPage({ user, initialRecipes, initialStock }: any) {
   const { lang, setLang } = useLang()
@@ -99,29 +102,63 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
     <Layout user={user} lang={lang} setLang={setLang}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 13, color: '#888' }}>{lang === 'ar' ? `${recipes.length} وصفة` : `${recipes.length} recipes`}</div>
-          <button className="btn btn-primary" onClick={() => { reset(); setShowForm(!showForm) }} style={{ fontSize: 13 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+          <MetricCard
+            label={lang === 'ar' ? 'الوصفات' : 'Recipes'}
+            value={recipes.length}
+            sub={lang === 'ar' ? 'وصفة مسجّلة' : 'recipes defined'}
+            icon={Icons.chef} tone="violet"
+          />
+          <MetricCard
+            label={lang === 'ar' ? 'متوسط كوست الحبة' : 'Avg Unit Cost'}
+            value={(recipes.length ? recipes.reduce((s, r) => s + getUnitCost(r), 0) / recipes.length : 0).toFixed(3)}
+            unit={t.currency}
+            sub={lang === 'ar' ? 'على مستوى كل الوصفات' : 'across all recipes'}
+            icon={Icons.wallet} tone="blue"
+          />
+          {(() => {
+            const withPrice = recipes.filter(r => (r.sell_price || 0) > 0)
+            const avgMargin = withPrice.length
+              ? withPrice.reduce((s, r) => s + ((r.sell_price - getUnitCost(r)) / r.sell_price) * 100, 0) / withPrice.length
+              : null
+            return (
+              <MetricCard
+                label={lang === 'ar' ? 'متوسط الهامش' : 'Avg Margin'}
+                value={avgMargin === null ? '—' : avgMargin.toFixed(1)}
+                unit={avgMargin === null ? undefined : '%'}
+                sub={lang === 'ar' ? `${withPrice.length} وصفة لها سعر بيع` : `${withPrice.length} priced recipes`}
+                icon={Icons.percent}
+                tone={avgMargin === null ? 'slate' : avgMargin < 15 ? 'amber' : 'green'}
+                valueColor={avgMargin === null ? undefined : avgMargin < 0 ? '#dc2626' : avgMargin < 15 ? '#d97706' : '#059669'}
+              />
+            )
+          })()}
+        </div>
+
+        <div className="page-head">
+          <div className="page-head-sub">{lang === 'ar' ? 'أدر وصفاتك ومكوّناتها وأسعار بيعها' : 'Manage recipes, ingredients and selling prices'}</div>
+          <button className="btn btn-primary" onClick={() => { reset(); setShowForm(!showForm) }}>
             {showForm ? (lang === 'ar' ? 'إلغاء' : 'Cancel') : (lang === 'ar' ? '+ وصفة جديدة' : '+ New Recipe')}
           </button>
         </div>
 
         {showForm && (
           <div className="card">
-            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 14 }}>
+            <div className="card-title" style={{ marginBottom: 16 }}>
               {editing ? (lang === 'ar' ? 'تعديل وصفة' : 'Edit Recipe') : (lang === 'ar' ? 'وصفة جديدة' : 'New Recipe')}
             </div>
 
             {/* Name */}
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 4 }}>{lang === 'ar' ? 'اسم الوصفة' : 'Recipe name'}</div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>{lang === 'ar' ? 'اسم الوصفة' : 'Recipe name'}</div>
               <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={lang === 'ar' ? 'مثال: كيكة الشوكلت' : 'e.g. Chocolate cake'} />
             </div>
 
             {/* Batch definition */}
             <div style={{ background: '#f5f5f3', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
               <div style={{ fontSize: 11, fontWeight: 500, color: '#555', marginBottom: 10 }}>
-                {lang === 'ar' ? '📦 وحدة الإنتاج' : '📦 Production unit'}
+                <span className="ico-sm" style={{ verticalAlign: '-2px', marginInlineEnd: 6 }}>{Icons.box}</span>
+                {lang === 'ar' ? 'وحدة الإنتاج' : 'Production unit'}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 1fr', gap: 10, alignItems: 'end' }}>
                 <div>
@@ -142,14 +179,14 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
               </div>
               <div style={{ fontSize: 11, color: '#1D9E75', marginTop: 8 }}>
                 {lang === 'ar'
-                  ? `✓ كل ${form.batch_unit} تنتج ${form.units_per_batch} ${form.output_unit}`
-                  : `✓ Each ${form.batch_unit} produces ${form.units_per_batch} ${form.output_unit}`}
+                  ? `كل ${form.batch_unit} تنتج ${form.units_per_batch} ${form.output_unit}`
+                  : `Each ${form.batch_unit} produces ${form.units_per_batch} ${form.output_unit}`}
               </div>
             </div>
 
             {/* Sell price */}
             <div style={{ marginBottom: 12, maxWidth: 200 }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: '#666', marginBottom: 4 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>
                 {lang === 'ar' ? `سعر البيع (للـ${form.output_unit})` : `Sell price (per ${form.output_unit})`}
               </div>
               <input
@@ -193,19 +230,19 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
         )}
 
         {/* Table */}
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 120px 90px 100px 100px 100px auto', gap: 8, padding: '10px 16px', borderBottom: '0.5px solid #d4d4d4', fontSize: 11, color: '#888', fontWeight: 500 }}>
-            <span>{lang === 'ar' ? 'الوصفة' : 'Recipe'}</span>
-            <span>{lang === 'ar' ? 'الإنتاج' : 'Output'}</span>
-            <span>{lang === 'ar' ? 'سعر البيع' : 'Sell Price'}</span>
-            <span>{lang === 'ar' ? 'كوست الصينية' : 'Batch Cost'}</span>
-            <span>{lang === 'ar' ? 'كوست الحبة' : 'Unit Cost'}</span>
-            <span>{lang === 'ar' ? 'هامش' : 'Margin'}</span>
-            <span></span>
-          </div>
-          <div style={{ padding: '0 16px' }}>
+        <div className="tbl" style={{ overflowX: 'auto' }}>
+          <div style={{ minWidth: 700 }}>
+            <div className="thead" style={{ gridTemplateColumns: COLS, gap: 8 }}>
+              <span>{lang === 'ar' ? 'الوصفة' : 'Recipe'}</span>
+              <span>{lang === 'ar' ? 'الإنتاج' : 'Output'}</span>
+              <span>{lang === 'ar' ? 'سعر البيع' : 'Sell Price'}</span>
+              <span>{lang === 'ar' ? 'كوست الدفعة' : 'Batch Cost'}</span>
+              <span>{lang === 'ar' ? 'كوست الحبة' : 'Unit Cost'}</span>
+              <span>{lang === 'ar' ? 'هامش' : 'Margin'}</span>
+              <span></span>
+            </div>
             {recipes.length === 0 ? (
-              <div style={{ padding: '24px 0', textAlign: 'center', color: '#888', fontSize: 13 }}>
+              <div className="tbl-empty">
                 {lang === 'ar' ? 'لا توجد وصفات. اضغط "+ وصفة جديدة".' : 'No recipes. Click "+ New Recipe".'}
               </div>
             ) : recipes.map(r => {
@@ -213,25 +250,23 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
               const uc = getUnitCost(r)
               const sp = r.sell_price || 0
               const margin = sp > 0 ? ((sp - uc) / sp * 100) : null
-              const mc = margin === null ? '#888' : margin < 0 ? '#A32D2D' : margin < 15 ? '#854F0B' : '#3B6D11'
+              const mc = margin === null ? '#9ca3af' : margin < 0 ? '#dc2626' : margin < 15 ? '#d97706' : '#059669'
               const batchUnit = r.batch_unit || r.output_unit
               const unitsPerBatch = r.units_per_batch || r.output_qty
               return (
-                <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 120px 90px 100px 100px 100px auto', gap: 8, alignItems: 'center', padding: '12px 0', borderBottom: '0.5px solid #e5e5e5', fontSize: 13 }}>
-                  <div>
-                    <div style={{ fontWeight: 500 }}>{r.name}</div>
-                    <div style={{ fontSize: 10, color: '#888' }}>{(r.ingredients || []).length} {lang === 'ar' ? 'مكون' : 'ingredients'}</div>
+                <div key={r.id} className="trow" style={{ gridTemplateColumns: COLS, gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>{r.name}</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af' }}>{(r.ingredients || []).length} {lang === 'ar' ? 'مكون' : 'ingredients'}</div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 12 }}>{batchUnit} ← {unitsPerBatch} {r.output_unit}</div>
-                  </div>
-                  <span>{sp > 0 ? `${sp.toFixed(2)} ${t.currency}` : '—'}</span>
-                  <span style={{ color: '#888' }}>{bc.toFixed(2)} {t.currency}</span>
-                  <span style={{ color: '#888' }}>{uc.toFixed(3)} {t.currency}</span>
-                  <span style={{ color: mc, fontWeight: 500 }}>{margin !== null ? margin.toFixed(0) + '%' : '—'}</span>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button onClick={() => startEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1D9E75', fontSize: 14, padding: 4 }}>✏️</button>
-                    <button onClick={() => deleteRecipe(r.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E24B4A', fontSize: 14, padding: 4 }}>🗑</button>
+                  <div style={{ fontSize: 12.5, color: '#6b7280' }}>{batchUnit} <span style={{ color: '#d1d5db' }}>→</span> <span className="num">{unitsPerBatch}</span> {r.output_unit}</div>
+                  <span className="num">{sp > 0 ? sp.toFixed(2) : '—'}</span>
+                  <span className="num" style={{ color: '#6b7280' }}>{bc.toFixed(2)}</span>
+                  <span className="num" style={{ color: '#6b7280' }}>{uc.toFixed(3)}</span>
+                  <span className="num" style={{ color: mc, fontWeight: 600 }}>{margin !== null ? margin.toFixed(0) + '%' : '—'}</span>
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    <button className="ibtn ibtn-edit" onClick={() => startEdit(r)} title={lang === 'ar' ? 'تعديل' : 'Edit'}><EditIcon /></button>
+                    <button className="ibtn ibtn-del" onClick={() => deleteRecipe(r.id)} title={lang === 'ar' ? 'حذف' : 'Delete'}><TrashIcon /></button>
                   </div>
                 </div>
               )
@@ -245,9 +280,9 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (!user.perms?.produce) return { redirect: { destination: '/403', permanent: false } }
+  const guard = await requirePage(req as any, { anyPerm: ['produce'] })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
   const bakery_id = user.bakery_id
   const [{ data: recipes }, { data: stock }] = await Promise.all([
     bakery_id

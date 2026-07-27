@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../supabase'
-import { hashPassword } from '../auth'
+import { hashPassword, invalidateUserCache } from '../auth'
 
 export async function getUserByUsername(username: string) {
   const { data } = await supabaseAdmin
@@ -38,15 +38,27 @@ export async function countPendingUsers(bakery_id: string | null) {
   return count ?? 0
 }
 
-export async function updateUser(id: string, bakery_id: string, update: {
+export async function updateUser(id: string, bakery_id: string, actor_id: string, update: {
   role?: string; perms?: object; status?: string
 }) {
-  // Fetch current token_version so we can invalidate the user's active sessions
   const { data: cur } = await supabaseAdmin
-    .from('users').select('token_version').eq('id', id).eq('bakery_id', bakery_id).single()
+    .from('users').select('token_version, role').eq('id', id).eq('bakery_id', bakery_id).single()
+  if (!cur) throw new Error('User not found')
+
+  // deleteUser has always refused to touch an admin; updating one was left open,
+  // so any manager holding the `users` permission could set the owner's status
+  // to 'rejected' — which also bumps token_version — and lock them out of their
+  // own bakery for good.
+  if (cur.role === 'admin') throw new Error('Cannot modify admin')
+
+  // Editing yourself here is never legitimate: the only reachable outcomes are
+  // granting yourself permissions or locking yourself out.
+  if (id === actor_id) throw new Error('Cannot modify your own account')
 
   const payload: any = { ...update }
-  if (cur?.token_version !== undefined) {
+  // Bump token_version so the change lands on active sessions immediately
+  // rather than whenever the old token happens to expire.
+  if (cur.token_version !== undefined && cur.token_version !== null) {
     payload.token_version = cur.token_version + 1
   }
 
@@ -59,9 +71,11 @@ export async function updateUser(id: string, bakery_id: string, update: {
     .maybeSingle()
   if (error) throw error
   if (!data) throw new Error('User not found')
+
+  invalidateUserCache(id)
 }
 
-export async function deleteUser(id: string, bakery_id: string) {
+export async function deleteUser(id: string, bakery_id: string, actor_id: string) {
   const { data: target } = await supabaseAdmin
     .from('users')
     .select('role')
@@ -70,12 +84,15 @@ export async function deleteUser(id: string, bakery_id: string) {
     .maybeSingle()
   if (!target) throw new Error('User not found')
   if (target.role === 'admin') throw new Error('Cannot delete admin')
+  if (id === actor_id) throw new Error('Cannot delete your own account')
   const { error } = await supabaseAdmin
     .from('users')
     .delete()
     .eq('id', id)
     .eq('bakery_id', bakery_id)
   if (error) throw error
+
+  invalidateUserCache(id)
 }
 
 export async function createUser(params: {

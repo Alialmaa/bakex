@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import type { GetServerSideProps } from 'next'
-import { getUser } from '../lib/auth'
+import { hasValidSession } from '../lib/auth'
 
 const GREEN = '#16a679'
 
@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div dir="rtl" style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    <div dir="rtl" style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'var(--font-ui)' }}>
       <div style={{ width: 380 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, background: GREEN, borderRadius: 14, marginBottom: 12, fontSize: 24 }}>🍞</div>
@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (user) return { redirect: { destination: '/dashboard', permanent: false } }
+  if (await hasValidSession(req as any))
+    return { redirect: { destination: '/dashboard', permanent: false } }
   return { props: {} }
 }

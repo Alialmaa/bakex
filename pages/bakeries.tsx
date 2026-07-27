@@ -1,9 +1,10 @@
 import type { GetServerSideProps } from 'next'
 import { useState } from 'react'
-import { getUser } from '../lib/auth'
+import { requirePage, isRedirect } from '../lib/auth'
 import { listBakeries, getBakeryUserCount } from '../lib/db/bakeries'
 import Layout from '../components/Layout'
 import { useLang } from '../lib/useLang'
+import { fmtDate } from '../lib/datetime'
 
 const GREEN = '#16a679'
 
@@ -268,7 +269,7 @@ export default function BakeriesPage({ user, bakeries: initial }: { user: any; b
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', color: '#555' }}>{b.user_count}</td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', color: '#888' }}>
-                        {new Date(b.created_at).toLocaleDateString('ar-SA')}
+                        {fmtDate(b.created_at, 'ar')}
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <StatusBadge bakery={b} />
@@ -359,9 +360,9 @@ export default function BakeriesPage({ user, bakeries: initial }: { user: any; b
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const user = getUser(req as any)
-  if (!user) return { redirect: { destination: '/login', permanent: false } }
-  if (user.role !== 'super_admin') return { redirect: { destination: '/', permanent: false } }
+  const guard = await requirePage(req as any, { superAdminOnly: true })
+  if (isRedirect(guard)) return guard
+  const { user } = guard
 
   const rows = await listBakeries()
   const bakeries = await Promise.all(
