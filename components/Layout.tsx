@@ -123,7 +123,9 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
             <div
               key={k}
               className={`nav-item ${currentPage === k ? 'active' : ''}`}
-              onClick={() => router.push(`/${k}`)}
+              // Re-navigating to the current page cost a full server round trip
+              // and re-rendered the same screen.
+              onClick={() => { if (currentPage !== k) router.push(`/${k}`) }}
             >
               <Icon name={k} size={16} />
               <span>{NAV_LABELS[k][lang]}</span>
