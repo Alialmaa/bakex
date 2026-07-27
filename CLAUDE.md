@@ -71,6 +71,23 @@ deploying** code that calls them.
 - **Rate limits**: password success may reset the *account* counter; the
   *access-code* counter is never reset (see the comment in `login.ts`).
 
+## Two different costs — don't mix them
+
+A page that renders a figure on the server *and* re-fetches it from an API must
+get both from the same function, or the number changes on refresh:
+
+- **COGS** — Σ(recipe unit cost × units sold). What the reports page means by
+  "إجمالي التكلفة", and what its product table adds up to.
+- **Purchase spend** — Σ of the `purchases` table for the period. Cash out this
+  month, regardless of when the material gets used. Zero in a month where
+  nothing was bought, even with plenty of sales.
+
+`lib/reports.ts` → `buildReport()` is the single source for the reports page:
+both `pages/reports.tsx` (getServerSideProps) and `/api/reports` (the 30-second
+refresh) call it. It returns COGS as `totals.cost` and purchase spend separately
+as `totals.purchaseCost`. **Compute neither figure inline in a page or route.**
+The dashboard's `monthProfit` is deliberately the purchase-based one.
+
 ## Testing without a real database
 
 `.env.local` here is a stub, so Supabase-backed paths can't run locally. Logic

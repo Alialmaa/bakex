@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { GetServerSideProps } from 'next'
 import { requirePage, isRedirect } from '../lib/auth'
-import { supabaseAdmin } from '../lib/supabase'
+import { buildReport } from '../lib/reports'
 import Layout from '../components/Layout'
 import { MetricCard, Icons } from '../components/Metric'
 import { T } from '../lib/translations'
@@ -14,7 +14,7 @@ export default function ReportsPage({ user, initialData, initialTotals, initialP
   const { lang, setLang } = useLang()
   const [sort, setSort] = useState<'profit' | 'margin' | 'cost'>('profit')
   const [data, setData] = useState(initialData || [])
-  const [totals, setTotals] = useState(initialTotals || { revenue: 0, cost: 0, profit: 0, avgMargin: 0 })
+  const [totals, setTotals] = useState(initialTotals || { revenue: 0, cost: 0, profit: 0, avgMargin: 0, purchaseCost: 0 })
   const [prodSummary, setProdSummary] = useState(initialProdSummary || [])
   const [lastUpdated, setLastUpdated] = useState(new Date())
   const [refreshing, setRefreshing] = useState(false)
@@ -202,54 +202,10 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   if (isRedirect(guard)) return guard
   const { user } = guard
 
-  const monthStart = new Date().toISOString().slice(0, 7) + '-01'
-  const bid = user.bakery_id
-  const [{ data: sales }, { data: recipes }, { data: stock }, { data: prodLog }] = await Promise.all([
-    bid ? supabaseAdmin.from('sales').select('*').eq('bakery_id', bid).gte('created_at', monthStart) : supabaseAdmin.from('sales').select('*').gte('created_at', monthStart),
-    bid ? supabaseAdmin.from('recipes').select('*').eq('bakery_id', bid) : supabaseAdmin.from('recipes').select('*'),
-    bid ? supabaseAdmin.from('stock').select('*').eq('bakery_id', bid) : supabaseAdmin.from('stock').select('*'),
-    bid ? supabaseAdmin.from('production_log').select('*').eq('bakery_id', bid).gte('created_at', monthStart) : supabaseAdmin.from('production_log').select('*').gte('created_at', monthStart),
-  ])
+  // Built by the same helper /api/reports uses. The two used to compute the
+  // metric cards differently — this one from recipe cost, the API from the
+  // purchases table — so the auto-refresh silently swapped one for the other.
+  const { data, totals, prodSummary } = await buildReport(user.bakery_id)
 
-  const getStk = (name: string) => (stock || []).find((s: any) => s.name === name)
-  const getUnitCost = (recipe: any) => {
-    const total = (recipe.ingredients || []).reduce((s: number, ing: any) => {
-      const m = getStk(ing.material)
-      return s + (m ? m.price_per_unit * ing.amount : 0)
-    }, 0)
-    const units = recipe.units_per_batch || recipe.output_qty || 1
-    return units > 0 ? total / units : 0
-  }
-
-  const data = (recipes || []).map((r: any) => {
-    const rSales = (sales || []).filter((s: any) => s.recipe_id === r.id)
-    const qty = rSales.reduce((s: number, l: any) => s + l.qty, 0)
-    const revenue = rSales.reduce((s: number, l: any) => s + l.total, 0)
-    const unitCost = getUnitCost(r)
-    const cost = unitCost * qty
-    const profit = revenue - cost
-    const margin = revenue > 0 ? (profit / revenue) * 100 : null
-    return { name: r.name, qty, revenue, cost, profit, margin, unitCost, sellPrice: r.sell_price || 0 }
-  })
-
-  const prodMap: Record<string, any> = {}
-  for (const l of (prodLog || [])) {
-    if (!prodMap[l.recipe_id]) {
-      const recipe = (recipes || []).find((r: any) => r.id === l.recipe_id)
-      const unitCost = recipe ? getUnitCost(recipe) : 0
-      prodMap[l.recipe_id] = { recipe_name: l.recipe_name, output_unit: l.output_unit, total: 0, unitCost, totalCost: 0 }
-    }
-    prodMap[l.recipe_id].total += l.output_qty
-    prodMap[l.recipe_id].totalCost += l.output_qty * prodMap[l.recipe_id].unitCost
-  }
-
-  const totals = {
-    revenue: data.reduce((s: number, d: any) => s + d.revenue, 0),
-    cost: data.reduce((s: number, d: any) => s + d.cost, 0),
-    profit: data.reduce((s: number, d: any) => s + d.profit, 0),
-    avgMargin: 0,
-  }
-  totals.avgMargin = totals.revenue > 0 ? (totals.profit / totals.revenue) * 100 : 0
-
-  return { props: { user, initialData: data, initialTotals: totals, initialProdSummary: Object.values(prodMap) } }
+  return { props: { user, initialData: data, initialTotals: totals, initialProdSummary: prodSummary } }
 }
