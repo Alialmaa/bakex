@@ -1,6 +1,7 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import { Plus_Jakarta_Sans, Tajawal } from 'next/font/google'
+import { LangProvider } from '../lib/useLang'
 import '../styles/globals.css'
 
 // Self-hosted at build time by next/font, so the strict CSP in next.config.js
@@ -50,7 +51,12 @@ export default function App({ Component, pageProps }: AppProps) {
             BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
       `}</style>
-      <Component {...pageProps} />
+      {/* The language state lives here rather than in each page, so a client-side
+          navigation cannot reset it to Arabic for a frame. requirePage() puts the
+          cookie's value on `user`, so the server already rendered the right one. */}
+      <LangProvider initialLang={pageProps?.user?.lang}>
+        <Component {...pageProps} />
+      </LangProvider>
     </>
   )
 }
