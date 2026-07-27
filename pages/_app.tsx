@@ -1,6 +1,9 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
 import { Plus_Jakarta_Sans, Tajawal } from 'next/font/google'
+import { LangProvider } from '../lib/useLang'
 import '../styles/globals.css'
 
 // Self-hosted at build time by next/font, so the strict CSP in next.config.js
@@ -18,6 +21,29 @@ const tajawal = Tajawal({
 })
 
 export default function App({ Component, pageProps }: AppProps) {
+  const router = useRouter()
+
+  /**
+   * Every page is server-rendered, so a navigation waits on a request before
+   * anything changes on screen — and nothing said so. The console showed
+   * "Loading initial props cancelled", which is Next reporting a route change
+   * abandoned because another started: clicks during the silence.
+   */
+  const [navigating, setNavigating] = useState(false)
+
+  useEffect(() => {
+    const start = () => setNavigating(true)
+    const stop = () => setNavigating(false)
+    router.events.on('routeChangeStart', start)
+    router.events.on('routeChangeComplete', stop)
+    router.events.on('routeChangeError', stop)
+    return () => {
+      router.events.off('routeChangeStart', start)
+      router.events.off('routeChangeComplete', stop)
+      router.events.off('routeChangeError', stop)
+    }
+  }, [router])
+
   return (
     <>
       <Head>
@@ -49,8 +75,41 @@ export default function App({ Component, pageProps }: AppProps) {
           --font-ui: var(--font-latin), var(--font-arabic), -apple-system,
             BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
+        .route-progress {
+          position: fixed;
+          top: 0;
+          inset-inline: 0;
+          height: 3px;
+          z-index: 9999;
+          background: transparent;
+          pointer-events: none;
+        }
+        .route-progress span {
+          display: block;
+          height: 100%;
+          width: 100%;
+          background: linear-gradient(90deg, #16a679, #34d399);
+          transform-origin: 0 50%;
+          animation: route-progress-grow 1.4s cubic-bezier(0.1, 0.6, 0.2, 1) forwards;
+        }
+        /* Approaches the far edge without reaching it: the request decides when
+           it is done, and the bar is removed at that moment. */
+        @keyframes route-progress-grow {
+          0%   { transform: scaleX(0.02); }
+          40%  { transform: scaleX(0.55); }
+          100% { transform: scaleX(0.9); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .route-progress span { animation: none; transform: scaleX(0.6); }
+        }
       `}</style>
-      <Component {...pageProps} />
+      {navigating && <div className="route-progress" aria-hidden="true"><span /></div>}
+      {/* The language state lives here rather than in each page, so a client-side
+          navigation cannot reset it to Arabic for a frame. requirePage() puts the
+          cookie's value on `user`, so the server already rendered the right one. */}
+      <LangProvider initialLang={pageProps?.user?.lang}>
+        <Component {...pageProps} />
+      </LangProvider>
     </>
   )
 }

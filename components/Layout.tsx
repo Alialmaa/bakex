@@ -57,15 +57,20 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
   const isRTL = lang === 'ar'
   const isSuperAdmin = user?.role === 'super_admin'
 
-  const [billing, setBilling] = useState<BillingInfo>(null)
+  // Seeded from the page's own props: requirePage() already resolved the
+  // subscription server-side. This used to always start as null and fetch
+  // /api/billing on every single page — a full round trip whose late arrival
+  // made the sidebar banner pop in and shift the layout after paint.
+  const [billing, setBilling] = useState<BillingInfo>(user?.billing ?? null)
 
   useEffect(() => {
     if (isSuperAdmin || !user?.bakery_id) return
+    if (user?.billing) return   // already known; pages that skip the subscription check still fetch
     fetch('/api/billing')
       .then(r => r.json())
       .then(d => setBilling(d))
       .catch(() => {})
-  }, [user?.bakery_id])
+  }, [user?.bakery_id, user?.billing, isSuperAdmin])
 
   const daysLeft = billing?.daysLeft ?? 0
   const showBanner = billing && billing.status !== 'active' && billing.status !== 'super_admin'
@@ -118,7 +123,9 @@ export default function Layout({ children, user, lang, setLang }: LayoutProps) {
             <div
               key={k}
               className={`nav-item ${currentPage === k ? 'active' : ''}`}
-              onClick={() => router.push(`/${k}`)}
+              // Re-navigating to the current page cost a full server round trip
+              // and re-rendered the same screen.
+              onClick={() => { if (currentPage !== k) router.push(`/${k}`) }}
             >
               <Icon name={k} size={16} />
               <span>{NAV_LABELS[k][lang]}</span>

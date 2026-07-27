@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs'
 import { parse, serialize } from 'cookie'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from './supabase'
-import { checkBakeryAccess } from './subscription'
+import { checkBakeryAccess, type SubscriptionAccess } from './subscription'
+import { parseLang } from './lang'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set. Refusing to start with an insecure default.')
@@ -259,7 +260,7 @@ export async function requirePage(
   if (!tokenUser) return redirectTo(loginTo)
 
   let user: any
-  let getAccess: () => Promise<{ allowed: boolean }>
+  let getAccess: () => Promise<SubscriptionAccess>
   try {
     ({ user, access: getAccess } = await resolveSessionWithAccess(tokenUser, opts.skipSubscription))
   } catch {
@@ -268,6 +269,15 @@ export async function requirePage(
     return redirectTo('/500')
   }
   if (!user) return redirectTo(loginTo)
+
+  // Both of these are already known here, and the browser used to go and get
+  // them again: the language sat in localStorage, invisible to the server, so
+  // every render started in Arabic and flipped after mount; and the sidebar
+  // fetched /api/billing on every page even though the subscription was just
+  // read a few lines below.
+  // Set only when present: getServerSideProps refuses to serialize `undefined`.
+  const cookieLang = parseLang(req.headers.cookie)
+  if (cookieLang) user.lang = cookieLang
 
   if (isSuperAdmin(user)) {
     if (opts.redirectSuperAdminTo) return redirectTo(opts.redirectSuperAdminTo)
@@ -282,6 +292,7 @@ export async function requirePage(
   if (user.bakery_id && !opts.skipSubscription) {
     const access = await getAccess()
     if (!access.allowed) return redirectTo('/billing')
+    user.billing = { status: access.status, daysLeft: access.daysLeft, allowed: access.allowed }
   }
 
   return { user }
