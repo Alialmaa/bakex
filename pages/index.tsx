@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router'
 import { useEffect, useRef, useState } from 'react'
 import { fmtDateLong } from '../lib/datetime'
+import { useTilt } from '../lib/useTilt'
 
 const G = '#16a679'
 const GD = '#0d7a5a'
@@ -32,42 +33,6 @@ const ICONS = {
   percent: 'M19 5L5 19M6.5 9a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM17.5 20a2.5 2.5 0 100-5 2.5 2.5 0 000 5z',
   down: 'M23 18l-9.5-9.5-5 5L1 6',
 } as const
-
-/**
- * Tilts an element in 3D toward the pointer.
- *
- * CSS transforms rather than a WebGL library: the CSP forbids scripts from other
- * origins, and a marketing page should not carry hundreds of kilobytes for an
- * effect the compositor can do on its own. Children with `translateZ` sit at
- * their own depths inside the same `preserve-3d` scene, so this reads as real
- * perspective and not a flat rotation.
- */
-function useTilt(max = 9) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [enabled, setEnabled] = useState(false)
-
-  useEffect(() => {
-    const fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches
-    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    setEnabled(fine && !still)
-  }, [])
-
-  const onMove = (e: React.MouseEvent) => {
-    const el = ref.current
-    if (!el || !enabled) return
-    const r = el.getBoundingClientRect()
-    const px = (e.clientX - r.left) / r.width - 0.5
-    const py = (e.clientY - r.top) / r.height - 0.5
-    el.style.transform = `rotateX(${(-py * max).toFixed(2)}deg) rotateY(${(px * max).toFixed(2)}deg)`
-  }
-
-  const onLeave = () => {
-    const el = ref.current
-    if (el) el.style.transform = 'rotateX(0deg) rotateY(0deg)'
-  }
-
-  return { ref, onMove, onLeave, enabled }
-}
 
 /** Reveals a section once it scrolls into view. */
 function useReveal<T extends HTMLElement>() {
