@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      # The build catches what the type checker does not — a page that cannot
+      # render, or an import that only resolves in development.
+      - name: Build
+        run: npm run build
+        env:
+          # Placeholders. Nothing here reaches a real database: the build only
+          # needs these present, because the app refuses to boot without them.
+          JWT_SECRET: ci-placeholder-secret-not-used-anywhere
+          APP_URL: https://ci.example.com
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
