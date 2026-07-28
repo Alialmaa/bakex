@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": [
+      "es2020",
+      "dom"
+    ],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noEmit": false,
+    "outDir": ".test-build",
+    "rootDir": ".",
+    "resolveJsonModule": true,
+    "jsx": "react",
+    "incremental": false
+  },
+  "include": [
+    "lib/**/*.ts",
+    "pages/api/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}

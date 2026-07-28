@@ -90,11 +90,37 @@ The dashboard's `monthProfit` is deliberately the purchase-based one.
 
 ## Testing without a real database
 
-`.env.local` here is a stub, so Supabase-backed paths can't run locally. Logic
-is checked by compiling the relevant modules and running them against a stubbed
-`supabaseAdmin` — see the pattern used during the security work. `tsc --noEmit`
-and `next build` are the fast gates. The SQL functions themselves can only be
-exercised against a real database, i.e. on Preview or Production.
+```
+npm test         # the suite
+npm run typecheck
+npm run build
+```
+
+All three run on every push and pull request (`.github/workflows/ci.yml`).
+
+`.env.local` is a stub, so nothing here can reach Supabase. `scripts/test.mjs`
+compiles `lib/`, `pages/api/` and `tests/` to `.test-build/`, then copies the
+compiled `tests/support/supabase-stub.js` over `.test-build/lib/supabase.js`.
+Every module under test then talks to the stub without knowing it, which is why
+the project needs no mocking library — and no test framework either, since
+Node's own runner does the rest.
+
+Fixtures live on `globalThis`, reached through `tests/support/db.ts`
+(`seed`, `onRpc`, `failWith`, `setLatency`, `calls`). The stub and that helper
+each define the accessor separately **on purpose**: the stub is copied to another
+directory before it runs, so a shared relative import would break.
+
+**Two caches will leak between tests if you forget them** — `invalidateUserCache`
+(30s) and `invalidateSubscriptionCache` (60s). Clear both in `beforeEach` for any
+test that changes a `users` or `bakeries` row, or you will be asserting against
+the previous test's snapshot.
+
+When stubbing an RPC, match the **real function's return shape** from the
+migration, not a convenient one: `rate_limit_hit` returns
+`{ allowed, retry_after_sec }`, not the raw counter.
+
+The SQL functions themselves can only be exercised against a real database, i.e.
+on Preview or Production.
 
 ## Post-deploy smoke test
 
