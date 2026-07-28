@@ -118,7 +118,12 @@ export default function LoginPage() {
           transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
           will-change: transform;
         }
-        .slide { transform-style: preserve-3d; animation: slide-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+        /* No fill mode. A transform animation that keeps filling never stops
+           being "active", and Chrome flattens the children of an element with a
+           running transform animation — which silently cancelled every
+           translateZ below and left the panel rotating as one flat card.
+           Without the fill, the animation ends and the depth comes back. */
+        .slide { transform-style: preserve-3d; animation: slide-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1); }
         .depth-1 { transform: translateZ(26px); }
         .depth-2 { transform: translateZ(44px); }
         .depth-3 { transform: translateZ(72px); }
