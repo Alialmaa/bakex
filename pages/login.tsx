@@ -1,28 +1,52 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import type { GetServerSideProps } from 'next'
 import { hasValidSession } from '../lib/auth'
 import { useLang } from '../lib/useLang'
+import { useTilt } from '../lib/useTilt'
 
 const G = '#16a679'
 const GD = '#0d7a5a'
 const DARK = '#0b0f1a'
 
-const FEATURES = [
+/**
+ * Three slides on the dark panel: the wordmark, then two hooks.
+ *
+ * The wordmark carries the first slide on its own at display size — a brand
+ * moment before any sales copy. Both hooks describe something the system
+ * actually does, so nothing here can be contradicted by using the product.
+ */
+type Slide =
+  | { kind: 'logo'; tagline: Bilingual }
+  | { kind: 'hook'; badge: Bilingual; title: Bilingual; desc: Bilingual }
+
+type Bilingual = { ar: string; en: string }
+
+const SLIDES: Slide[] = [
   {
-    badge:   { ar: 'كاشير احترافي',    en: 'Pro Cashier' },
-    title:   { ar: 'فواتير في ثوانٍ',  en: 'Invoices in Seconds' },
-    desc:    { ar: 'واجهة كاشير سريعة تعمل على أي جهاز — جوال، تابلت، أو كمبيوتر — بدون تعقيد.', en: 'A fast POS interface that runs on any device — phone, tablet, or desktop — with zero complexity.' },
+    kind: 'logo',
+    tagline: {
+      ar: 'من المخزون إلى الكاشير إلى التقارير — في نظام واحد',
+      en: 'Inventory, till and reports — in one system',
+    },
   },
   {
-    badge:   { ar: 'مخزون ذكي',          en: 'Smart Inventory' },
-    title:   { ar: 'تتبع كل مادة خام',   en: 'Track Every Ingredient' },
-    desc:    { ar: 'خصم تلقائي من المخزون مع كل بيع، وتنبيهات فورية عند نفاد المواد.', en: 'Auto-deduct stock with every sale and get instant alerts when ingredients run low.' },
+    kind: 'hook',
+    badge: { ar: 'حساب التكاليف', en: 'Cost Control' },
+    title: { ar: 'اعرف ربح كل قطعة', en: 'Know every unit’s profit' },
+    desc: {
+      ar: 'كوست كل وصفة يُحسب من مكوّناتها وأسعار مشترياتك — فترى الهامش الحقيقي لكل منتج، لا التخمين.',
+      en: 'Each recipe is costed from its ingredients and your purchase prices, so you see the real margin per product instead of guessing.',
+    },
   },
   {
-    badge:   { ar: 'تقارير تفصيلية',        en: 'Detailed Reports' },
-    title:   { ar: 'قرارات مبنية على بيانات', en: 'Data-Driven Decisions' },
-    desc:    { ar: 'تقارير يومية وشهرية للمبيعات والأرباح والتكاليف بضغطة واحدة.', en: 'Daily and monthly reports for sales, profit, and costs — one tap away.' },
+    kind: 'hook',
+    badge: { ar: 'مخزون ذكي', en: 'Smart Inventory' },
+    title: { ar: 'كل فاتورة تنزل من المخزون', en: 'Every invoice moves stock' },
+    desc: {
+      ar: 'الخصم يحدث لحظة البيع، وتنبيهك يوصل قبل ما تنفد المادة — بدون جرد يدوي في آخر اليوم.',
+      en: 'Stock moves the moment you sell, and you are warned before an ingredient runs out — no end-of-day count.',
+    },
   },
 ]
 
@@ -38,9 +62,20 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [featureIdx, setFeatureIdx] = useState(0)
+  const [held, setHeld] = useState(false)
   const isAR = lang === 'ar'
-  const feat = FEATURES[featureIdx]
+  const slide = SLIDES[featureIdx]
   const fl = isAR ? 'ar' : 'en'
+  const tilt = useTilt(7)
+
+  // Advances on its own so the panel is not a still image, and stops for good
+  // once the visitor picks a slide themselves.
+  useEffect(() => {
+    if (held) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const t = setInterval(() => setFeatureIdx(i => (i + 1) % SLIDES.length), 6000)
+    return () => clearInterval(t)
+  }, [held])
 
   const handleLogin = async () => {
     setError('')
@@ -76,8 +111,42 @@ export default function LoginPage() {
   return (
     <div dir={isAR ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', display: 'flex', fontFamily: 'var(--font-ui)' }}>
 
+      <style jsx>{`
+        .scene { perspective: 1000px; }
+        .tilt {
+          transform-style: preserve-3d;
+          transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+          will-change: transform;
+        }
+        /* No fill mode. A transform animation that keeps filling never stops
+           being "active", and Chrome flattens the children of an element with a
+           running transform animation — which silently cancelled every
+           translateZ below and left the panel rotating as one flat card.
+           Without the fill, the animation ends and the depth comes back. */
+        .slide { transform-style: preserve-3d; animation: slide-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1); }
+        .depth-1 { transform: translateZ(26px); }
+        .depth-2 { transform: translateZ(44px); }
+        .depth-3 { transform: translateZ(72px); }
+        @keyframes slide-in {
+          from { opacity: 0; transform: translateZ(-70px) rotateY(10deg); }
+          to   { opacity: 1; transform: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .tilt { transition: none; }
+          .slide { animation: none; }
+        }
+        /* The two panels had no breakpoint, so on a phone they sat side by side
+           and the login form was clipped to about half a screen. The dark panel
+           is presentation only — it stands down and the form takes the width.
+           !important because the display it overrides is an inline style. */
+        @media (max-width: 900px) {
+          .panel { display: none !important; }
+          .form-pane { flex: 1 1 100% !important; }
+        }
+      `}</style>
+
       {/* ── LEFT: Dark panel ── */}
-      <div style={{
+      <div className="panel" style={{
         flex: '0 0 52%',
         background: `radial-gradient(ellipse 90% 70% at 50% 30%, rgba(22,166,121,0.15) 0%, transparent 65%), linear-gradient(160deg, #0b0f1a 0%, #0d1a2e 100%)`,
         display: 'flex', flexDirection: 'column',
@@ -88,40 +157,82 @@ export default function LoginPage() {
         {/* Grid overlay */}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none' }} />
 
-        {/* Logo */}
-        <div style={{ position: 'relative' }}>
+        {/* Small corner wordmark — stood down while the logo slide is showing,
+            so the mark is not on screen twice at two sizes. */}
+        <div style={{ position: 'relative', opacity: slide.kind === 'logo' ? 0 : 1, transition: 'opacity 0.4s' }}>
           <span style={{ fontWeight: 800, fontSize: 25, color: '#fff', letterSpacing: '-0.7px' }}>
             Bake<span style={{ color: G }}>x</span>
           </span>
         </div>
 
-        {/* Feature content — grows to fill */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative' }}>
-          {/* Badge */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(22,166,121,0.12)', border: '1px solid rgba(22,166,121,0.28)', borderRadius: 99, padding: '6px 16px', fontSize: 13, color: '#34d399', fontWeight: 600, marginBottom: 28, width: 'fit-content' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: G, boxShadow: `0 0 8px ${G}` }} />
-            {feat.badge[fl]}
-          </div>
+        {/* Slide — the scene tilts toward the pointer, layers sit at depth */}
+        <div
+          className="scene"
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative' }}
+          onMouseMove={tilt.onMove}
+          onMouseLeave={tilt.onLeave}
+        >
+          <div ref={tilt.ref} className="tilt">
+            {slide.kind === 'logo' ? (
+              <div key="logo" className="slide" style={{ position: 'relative' }}>
+                {/* Glow sits behind and further back, so it parallaxes against
+                    the wordmark instead of moving with it. */}
+                <div className="glow" style={{
+                  position: 'absolute', top: '50%', [isAR ? 'right' : 'left']: '-8%',
+                  width: 520, height: 320, transform: 'translateY(-55%) translateZ(-70px)',
+                  background: `radial-gradient(ellipse, rgba(22,166,121,0.28) 0%, transparent 68%)`,
+                  pointerEvents: 'none',
+                }} />
+                <div className="depth-3" style={{ position: 'relative' }}>
+                  <div style={{
+                    fontWeight: 800,
+                    fontSize: 'clamp(64px, 11vw, 148px)',
+                    lineHeight: 0.95,
+                    color: '#fff',
+                    letterSpacing: '-5px',
+                    direction: 'ltr',
+                    textShadow: '0 24px 60px rgba(0,0,0,0.55)',
+                  }}>
+                    Bake<span style={{ color: G }}>x</span>
+                  </div>
+                </div>
+                <div className="depth-1" style={{ position: 'relative', marginTop: 26 }}>
+                  <div style={{ height: 3, width: 72, background: G, borderRadius: 99, marginBottom: 22, boxShadow: `0 0 18px ${G}` }} />
+                  <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.55)', lineHeight: 1.8, maxWidth: 400 }}>
+                    {slide.tagline[fl]}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div key={featureIdx} className="slide">
+                <div className="depth-1" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(22,166,121,0.12)', border: '1px solid rgba(22,166,121,0.28)', borderRadius: 99, padding: '6px 16px', fontSize: 13, color: '#34d399', fontWeight: 600, marginBottom: 28, width: 'fit-content' }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: G, boxShadow: `0 0 8px ${G}` }} />
+                  {slide.badge[fl]}
+                </div>
 
-          <h2 style={{ fontSize: 'clamp(32px,3.5vw,52px)', fontWeight: 900, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1.1, marginBottom: 20 }}>
-            {feat.title[fl]}
-          </h2>
-          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)', lineHeight: 1.85, maxWidth: 400 }}>
-            {feat.desc[fl]}
-          </p>
+                <h2 className="depth-2" style={{ fontSize: 'clamp(32px,3.5vw,52px)', fontWeight: 900, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1.1, marginBottom: 20 }}>
+                  {slide.title[fl]}
+                </h2>
+                <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)', lineHeight: 1.85, maxWidth: 400 }}>
+                  {slide.desc[fl]}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Slide indicators */}
         <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
-          {FEATURES.map((_, i) => (
-            <button key={i} onClick={() => setFeatureIdx(i)}
+          {SLIDES.map((_, i) => (
+            <button key={i} onClick={() => { setFeatureIdx(i); setHeld(true) }}
+              aria-label={`${i + 1} / ${SLIDES.length}`}
               style={{ height: 4, width: i === featureIdx ? 32 : 16, borderRadius: 99, border: 'none', cursor: 'pointer', background: i === featureIdx ? G : 'rgba(255,255,255,0.2)', transition: 'all 0.3s', padding: 0 }} />
           ))}
         </div>
       </div>
 
       {/* ── RIGHT: Form panel ── */}
-      <div style={{ flex: 1, background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 40px', position: 'relative' }}>
+      <div className="form-pane" style={{ flex: 1, background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 40px', position: 'relative' }}>
 
         {/* Lang toggle — top */}
         <div style={{ position: 'absolute', top: 24, [isAR ? 'left' : 'right']: 24, display: 'flex', background: '#f3f4f6', borderRadius: 8, padding: 3, gap: 2 }}>
