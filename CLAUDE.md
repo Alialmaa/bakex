@@ -20,6 +20,19 @@ Production **and** Preview:
 | `RESEND_API_KEY` | Transactional email (verification, password reset). |
 | `APP_URL` | Origin used to build email links, e.g. `https://bakexsystem.com`. **Must be set** — see security note below. |
 
+Optional, read by `lib/payment.ts` and shown on `/billing`. Each is safe to leave
+unset — the page degrades to the next payment method rather than breaking:
+
+| Variable | Purpose |
+|---|---|
+| `PAYMENT_LINK_URL` | Hosted payment link. **https only**; anything else is ignored and the card button disappears. |
+| `BANK_NAME`, `BANK_IBAN`, `BANK_ACCOUNT_NAME` | Bank transfer details. Shown only when **all three** are set — partial details cannot be paid into. |
+| `SUPPORT_WHATSAPP` | Support number. Non-digits are stripped, so a pasted `+966 55 …` works. |
+
+The subscription is a single charge once a year, so this deliberately has no
+recurring billing, no stored cards and no webhooks. A payment link is enough
+until manual activation becomes the bottleneck.
+
 Changing an env var needs a redeploy to take effect; Vercel does not rebuild
 automatically.
 
