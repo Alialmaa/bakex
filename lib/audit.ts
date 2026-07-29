@@ -2,7 +2,8 @@ import { supabaseAdmin } from './supabase'
 
 export async function logAudit(opts: {
   bakery_id: string
-  actor_id: string
+  /** Null for entries no user made — the payment webhook, for one. */
+  actor_id: string | null
   actor_name?: string
   action: string
   target_type: string

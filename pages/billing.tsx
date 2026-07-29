@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import type { GetServerSideProps } from 'next'
 import { requirePage, isRedirect } from '../lib/auth'
 import { checkBakeryAccess } from '../lib/subscription'
-import { paymentConfig, whatsappUrl, type PaymentConfig } from '../lib/payment'
+import { paymentConfig, paymentLinkFor, whatsappUrl, type PaymentConfig } from '../lib/payment'
 
 const GREEN = '#16a679'
 const DARK = '#0b0f1a'
@@ -178,5 +178,10 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
     }
   }
 
-  return { props: { user: { ...user, billing }, payment: paymentConfig() } }
+  // The link carries the bakery id so the webhook can attribute the payment.
+  // It is set here, from the session, rather than anywhere the browser can edit.
+  const payment = paymentConfig()
+  payment.link = paymentLinkFor(payment.link, user.bakery_id)
+
+  return { props: { user: { ...user, billing }, payment } }
 }

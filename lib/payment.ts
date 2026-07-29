@@ -54,5 +54,29 @@ export function paymentConfig(): PaymentConfig {
   }
 }
 
+/**
+ * Stamps the bakery onto the payment link.
+ *
+ * The webhook refuses any payment it cannot attribute — `metadata.bakery_id` is
+ * how a charge at the gateway becomes a subscription here, and it is the only
+ * part of this the customer's browser touches. Sending the wrong id would only
+ * ever credit someone else, which is why the id comes from the session on the
+ * server, not from the page.
+ *
+ * If the gateway drops the parameter the webhook logs `no_bakery` and activates
+ * nothing, so a mistake here is visible rather than expensive. Confirm it with
+ * one real payment before pointing customers at the link.
+ */
+export function paymentLinkFor(link: string | null, bakeryId?: string | null): string | null {
+  if (!link || !bakeryId) return link
+  try {
+    const u = new URL(link)
+    u.searchParams.set('metadata[bakery_id]', bakeryId)
+    return u.toString()
+  } catch {
+    return link
+  }
+}
+
 export const whatsappUrl = (number: string, text: string) =>
   `https://wa.me/${number}?text=${encodeURIComponent(text)}`

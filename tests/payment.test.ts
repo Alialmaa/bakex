@@ -1,6 +1,6 @@
 import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { paymentConfig, formatIban, whatsappUrl, YEARLY_PRICE } from '../lib/payment'
+import { paymentLinkFor, paymentConfig, formatIban, whatsappUrl, YEARLY_PRICE } from '../lib/payment'
 
 /**
  * The billing page renders whatever this returns, so a bad value here is money
@@ -106,5 +106,30 @@ describe('the price', () => {
   test('is the annual figure the pricing page states', () => {
     assert.equal(YEARLY_PRICE, 2500)
     assert.equal(paymentConfig().price, YEARLY_PRICE)
+  })
+})
+
+describe('paymentLinkFor', () => {
+  const LINK = 'https://moyasar.com/pay/abc'
+
+  test('stamps the bakery on, which is the only way the webhook can attribute the payment', () => {
+    const url = new URL(paymentLinkFor(LINK, 'b-42')!)
+    assert.equal(url.searchParams.get('metadata[bakery_id]'), 'b-42')
+  })
+
+  test('keeps the parameters the link already had', () => {
+    const url = new URL(paymentLinkFor(`${LINK}?amount=250000`, 'b-42')!)
+    assert.equal(url.searchParams.get('amount'), '250000')
+  })
+
+  test('replaces rather than appends, so one id reaches the gateway', () => {
+    const url = new URL(paymentLinkFor(`${LINK}?metadata[bakery_id]=someone-else`, 'b-42')!)
+    assert.deepEqual(url.searchParams.getAll('metadata[bakery_id]'), ['b-42'])
+  })
+
+  test('passes through untouched when there is no link or no bakery', () => {
+    assert.equal(paymentLinkFor(null, 'b-42'), null)
+    assert.equal(paymentLinkFor(LINK, null), LINK)
+    assert.equal(paymentLinkFor(LINK, undefined), LINK)
   })
 })

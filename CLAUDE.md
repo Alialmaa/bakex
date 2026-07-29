@@ -19,6 +19,12 @@ Production **and** Preview:
 | `JWT_SECRET` | Signs the auth cookie. The app refuses to boot without it. |
 | `RESEND_API_KEY` | Transactional email (verification, password reset). |
 | `APP_URL` | Origin used to build email links, e.g. `https://bakexsystem.com`. **Must be set** — see security note below. |
+| `MOYASAR_SECRET_KEY` | Server-side gateway key (`sk_…`). Used to read a payment back by id. Never sent to the browser. |
+| `MOYASAR_WEBHOOK_TOKEN` | Shared secret set on the webhook in the Moyasar dashboard. |
+| `PAYMENT_LINK_URL` | Hosted payment link. Unset ⇒ the billing page shows bank transfer and WhatsApp only. |
+
+With either Moyasar variable unset, `/api/payments/moyasar` answers 503 to
+everything — the gateway is off, not open.
 
 Optional, read by `lib/payment.ts` and shown on `/billing`. Each is safe to leave
 unset — the page degrades to the next payment method rather than breaking:
@@ -40,7 +46,7 @@ automatically.
 
 Applied by hand in Supabase → SQL Editor, in order. Run each **one step at a
 time** — pasting a whole file into the web editor has truncated it mid-token.
-All four are applied to the current production database.
+001–004 are applied to the current production database; 005 is not yet.
 
 | File | What it adds |
 |---|---|
@@ -48,6 +54,7 @@ All four are applied to the current production database.
 | `002_rate_limit_and_atomicity.sql` | `rate_limits` table, `rate_limit_hit`, `produce_recipe`, `adjust_stock_qty`, the `(bakery_id, name)` unique index on stock |
 | `003_missing_objects.sql` | `invoices`, `audit_log`, `invoice_seq`, `next_invoice_seq` — objects the code assumed but no migration created |
 | `004_reporting_aggregates.sql` | `sales_revenue`, `sales_by_recipe`, `sales_daily_totals`, `purchase_cost`, `production_by_recipe`, `low_stock_count`, `low_stock_items` |
+| `005_subscription_payments.sql` | `subscription_payments`, `apply_subscription_payment` — the payment ledger and the one function that grants a subscription |
 
 **Any new SQL function needs `GRANT EXECUTE ... TO service_role`** after its
 `REVOKE`. The API connects as `service_role`; without the grant the call fails
@@ -83,6 +90,14 @@ deploying** code that calls them.
   Raising it changes what customers pay — a pricing decision, not a code fix.
 - **Rate limits**: password success may reset the *account* counter; the
   *access-code* counter is never reset (see the comment in `login.ts`).
+- **A subscription is granted from a verified payment, never from a request.**
+  `/api/payments/moyasar` takes exactly one thing from the POST body — the
+  payment id — and reads the amount, currency, status and `metadata.bakery_id`
+  back from Moyasar's API before anything is applied. The shared token filters
+  cheap noise; it is not the proof. Replay is stopped in SQL by the unique
+  `(provider, provider_payment_id)` index inside `apply_subscription_payment`,
+  not by a check in JS. Do not add a path that activates on a webhook body
+  alone, and do not restore self-service activation in `/api/billing`.
 
 ## Two different costs — don't mix them
 
