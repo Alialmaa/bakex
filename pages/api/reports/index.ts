@@ -13,8 +13,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Same builder the page's getServerSideProps uses, so the 30-second refresh
-    // cannot replace the rendered figures with a differently-defined set.
-    return res.status(200).json(await buildReport(bakery_id))
+    // cannot replace the rendered figures with a differently-defined set — and
+    // the range travels with the request, so a refresh cannot quietly snap the
+    // period back to the current month either.
+    return res.status(200).json(await buildReport(bakery_id, req.query))
   } catch (e) {
     return apiError(res, e, 'reports')
   }

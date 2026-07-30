@@ -15,8 +15,17 @@ import type { MouseEvent } from 'react'
  *
  * Does nothing without a fine pointer (so, nothing on touch) or when the visitor
  * asks for reduced motion.
+ *
+ * @param max   how far the pointer can tilt it, in degrees
+ * @param baseX a resting rotateX the pointer tilts around, for scenes that are
+ *              meant to sit at an angle even when nobody is pointing at them.
+ *              Keep the same value in the element's CSS so the untilted first
+ *              paint — and every touch device — matches.
+ * @param baseY the same for rotateY. A scene of boxes needs one: with rotateY
+ *              at zero their side faces are edge-on and the depth is invisible
+ *              until the pointer moves.
  */
-export function useTilt(max = 9) {
+export function useTilt(max = 9, baseX = 0, baseY = 0) {
   const ref = useRef<HTMLDivElement>(null)
   const [enabled, setEnabled] = useState(false)
 
@@ -32,12 +41,12 @@ export function useTilt(max = 9) {
     const r = el.getBoundingClientRect()
     const px = (e.clientX - r.left) / r.width - 0.5
     const py = (e.clientY - r.top) / r.height - 0.5
-    el.style.transform = `rotateX(${(-py * max).toFixed(2)}deg) rotateY(${(px * max).toFixed(2)}deg)`
+    el.style.transform = `rotateX(${(baseX - py * max).toFixed(2)}deg) rotateY(${(baseY + px * max).toFixed(2)}deg)`
   }
 
   const onLeave = () => {
     const el = ref.current
-    if (el) el.style.transform = 'rotateX(0deg) rotateY(0deg)'
+    if (el) el.style.transform = `rotateX(${baseX}deg) rotateY(${baseY}deg)`
   }
 
   return { ref, onMove, onLeave, enabled }

@@ -95,11 +95,21 @@ get both from the same function, or the number changes on refresh:
   month, regardless of when the material gets used. Zero in a month where
   nothing was bought, even with plenty of sales.
 
-`lib/reports.ts` → `buildReport()` is the single source for the reports page:
-both `pages/reports.tsx` (getServerSideProps) and `/api/reports` (the 30-second
-refresh) call it. It returns COGS as `totals.cost` and purchase spend separately
-as `totals.purchaseCost`. **Compute neither figure inline in a page or route.**
-The dashboard's `monthProfit` is deliberately the purchase-based one.
+`lib/reports.ts` → `buildReport(bakery_id, query)` is the single source for the
+reports page: both `pages/reports.tsx` (getServerSideProps) and `/api/reports`
+(the 30-second refresh) call it. It returns COGS as `totals.cost` and purchase
+spend separately as `totals.purchaseCost`. **Compute neither figure inline in a
+page or route.** The dashboard's `monthProfit` is deliberately the purchase-based
+one.
+
+**The period travels with the request.** `lib/reportRange.ts` → `resolveRange()`
+turns the query string into `{from, to, days, prev}`; both the page and the API
+pass their own query through, so the auto-refresh cannot snap the view back to
+the current month. Bad input falls back to month-to-date rather than erroring,
+and a custom range is capped at 731 days. Bounds are inclusive of both end days
+(`fromBound`/`toBound`) because the SQL aggregates compare `>= p_from AND
+<= p_to` — passing a bare date as `p_to` silently drops that day's sales.
+Everything is UTC, matching the day-cutting comment in `004`.
 
 ## Testing without a real database
 
