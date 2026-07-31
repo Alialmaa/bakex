@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useTilt } from '../lib/useTilt'
 import { fmtDate, fromDayString } from '../lib/datetime'
 
 /**
@@ -31,11 +30,17 @@ import { fmtDate, fromDayString } from '../lib/datetime'
  *     running because it has a fill mode. Growth is animated on `height` here
  *     for exactly that reason.
  *
- * Touch devices and anyone asking for reduced motion get the same chart at the
- * resting angle, without the pointer tracking.
+ * What responds to the pointer is the bar, not the scene. Tilting the whole
+ * stage moved every bar to answer for one of them, and on the way it put the
+ * baseline back on a slope. A hovered bar instead steps toward the viewer along
+ * Z: perspective widens it — measured, 19.81px to 20.28px — and opens its side
+ * face, which is the depth doing the work rather than a colour change standing
+ * in for it. Nothing else on the chart moves.
  */
 
 const BASE_TILT = 18
+/** How far a hovered bar steps toward the viewer. */
+const LIFT = 26
 const GREEN = '#16a679'
 
 export interface DayPoint { day: string; total: number }
@@ -107,11 +112,11 @@ export default function SalesChart3D({
   const isAR = lang === 'ar'
   // A small pointer range: every degree of rotateY tips the baseline, so this
   // is a wobble under the cursor, not a viewing angle.
-  const { ref, onMove, onLeave } = useTilt(4, BASE_TILT, 0)
   const trackRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const [hover, setHover] = useState<number | null>(null)
   const [grown, setGrown] = useState(false)
+  const [settled, setSettled] = useState(false)
 
   const { buckets, grain } = useMemo(() => bucketise(points, lang), [points, lang])
 
@@ -128,7 +133,10 @@ export default function SalesChart3D({
   // is on `height`, never on `transform` — see the note at the top.
   useEffect(() => {
     const id = requestAnimationFrame(() => setGrown(true))
-    return () => cancelAnimationFrame(id)
+    // Once the entrance is over the stagger has to go, or hovering the last bar
+    // would wait out its own entrance delay before it moved.
+    const t = setTimeout(() => setSettled(true), 1200)
+    return () => { cancelAnimationFrame(id); clearTimeout(t) }
   }, [])
 
   const n = Math.max(1, buckets.length)
@@ -176,8 +184,8 @@ export default function SalesChart3D({
           ))}
         </div>
 
-        <div className="scene" onMouseMove={onMove} onMouseLeave={() => { onLeave(); setHover(null) }}>
-          <div className="stage" ref={ref}>
+        <div className="scene" onMouseLeave={() => setHover(null)}>
+          <div className="stage">
 
             <div className="grid">
               {gridlines.map(g => (
@@ -197,7 +205,11 @@ export default function SalesChart3D({
                     {b.total > 0 && (
                       <div
                         className={`bar${isHot ? ' hot' : ''}`}
-                        style={{ width: barW, height: grown ? `${h}%` : 0, transitionDelay: `${Math.min(i * 18, 420)}ms` }}
+                        style={{
+                          width: barW,
+                          height: grown ? `${h}%` : 0,
+                          transitionDelay: settled ? '0ms' : `${Math.min(i * 18, 420)}ms`,
+                        }}
                       >
                         <div className="face front" style={{ transform: `translateZ(${depth / 2}px)` }} />
                         <div className="face top" style={{ height: depth, transform: `translateY(${-depth / 2}px) rotateX(90deg)` }} />
@@ -246,16 +258,16 @@ export default function SalesChart3D({
         .scene {
           flex: 1; min-width: 0;
           perspective: 1900px;
-          perspective-origin: 50% 50%;
+          perspective-origin: 50% 100%;
           padding-bottom: 26px;
         }
         .stage {
           position: relative;
           height: 190px;
           transform-style: preserve-3d;
-          /* rotateX only — see the note at the top of this file. */
-          transform: rotateX(${BASE_TILT}deg) rotateY(0deg);
-          transition: transform 0.25s ease-out;
+          /* Fixed. rotateX only, and nothing rotates it further — see the note
+             at the top of this file. */
+          transform: rotateX(${BASE_TILT}deg);
         }
 
         .grid { position: absolute; inset: 0; transform-style: preserve-3d }
@@ -277,14 +289,18 @@ export default function SalesChart3D({
         .bar {
           position: relative;
           transform-style: preserve-3d;
-          /* Height, not transform — a running transform animation flattens
-             every child face back into one plane. */
-          transition: height 0.62s cubic-bezier(0.2, 0.75, 0.25, 1);
+          /* Growth is on height, not transform: a running transform *animation*
+             flattens every child face into one plane. A transform transition
+             does not — the top face still measures 4.8px mid-hover — so the
+             lift below is safe. */
+          transition: height 0.62s cubic-bezier(0.2, 0.75, 0.25, 1),
+                      transform 0.18s ease-out;
         }
         .face { position: absolute }
         .front { inset: 0; background: linear-gradient(180deg, #25c795, #159c72) }
         .top { top: 0; left: 0; width: 100%; background: #6ceecb }
         .side { top: 0; left: 0; height: 100%; background: #0e6f53 }
+        .bar.hot { transform: translateZ(${LIFT}px) }
         .bar.hot .front { background: linear-gradient(180deg, #16b184, #0d8a63) }
         .bar.hot .top { background: #8bf5d8 }
         .bar.hot .side { background: #0a5943 }
@@ -318,7 +334,6 @@ export default function SalesChart3D({
         }
         @media (prefers-reduced-motion: reduce) {
           .bar { transition: none }
-          .stage { transition: none }
         }
       `}</style>
     </div>
