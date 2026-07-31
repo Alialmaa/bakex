@@ -162,6 +162,27 @@ migration, not a convenient one: `rate_limit_hit` returns
 The SQL functions themselves can only be exercised against a real database, i.e.
 on Preview or Production.
 
+## Importing a spreadsheet
+
+`lib/csvParse.ts` reads CSV and tab-separated text — **do not add an xlsx
+dependency**. The two routes that matter are a `.csv` saved out of Excel and
+cells copied from Excel and pasted, and both are plain delimited text.
+
+The hard part is locale, not format. An Arabic Excel writes `١٬٢٥٠٫٥٠ ر.س`, and
+`ر.س` contains a dot, so currency and units are trimmed from the **ends only** —
+stripping every non-digit anywhere turns that into `1250.50.` and welds `١٢أ٣`
+into `123` instead of rejecting it. When `.` and `,` both appear, the later one
+is the decimal separator.
+
+`lib/importStock.ts` maps columns by synonym after `normaliseHeader` folds alef,
+ta-marbuta and diacritics, so the synonym lists are written in that folded form
+(`الحد الأدنى` is matched as `الحد الادني`). A repeated material name is
+collapsed last-one-wins in **both** the preview and the route — the unique index
+on `(bakery_id, name)` would otherwise reject the whole batch.
+
+**An import never deletes.** It adds and, in `update` mode, overwrites; a
+material absent from the file is left alone. A first upload is usually partial.
+
 ## Post-deploy smoke test
 
 Log in → dashboard → reports → **produce a batch** → record a purchase → edit a
