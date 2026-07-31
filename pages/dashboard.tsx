@@ -12,6 +12,7 @@ import { countPendingUsers } from '../lib/db/users'
 import { getPurchaseCostInRange } from '../lib/db/purchases'
 import { listRecipes } from '../lib/db/recipes'
 import { fmtDate, fmtTime } from '../lib/datetime'
+import { businessToday, dayStart, dayEnd, monthStart as monthStartOf, isOnDay } from '../lib/businessDay'
 
 interface WeekDay { day: string; total: number }
 interface TopProduct { name: string; qty: number; revenue: number }
@@ -251,24 +252,26 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   const { user } = guard
 
   const bakery_id = user.bakery_id
-  const today = new Date().toISOString().split('T')[0]
-  const monthStart = today.slice(0, 7) + '-01'
+  // The bakery's day, not UTC's: at 1am local the UTC date is still yesterday,
+  // so "مبيعات اليوم" measured a day that had already ended.
+  const today = businessToday()
+  const monthStart = monthStartOf(today)
 
   // Totals are aggregates now. This used to fetch every sale for today AND for
   // the month, plus the entire production history, then reduce all of it here
   // just to display five numbers and a top-five list.
   const [todayRev, monthRev, lowStock, alertRows, recentLog, pendingCount,
          weeklySales, monthCost, recipes, salesByRecipe] = await Promise.all([
-    getSalesRevenue(bakery_id, today),
-    getSalesRevenue(bakery_id, monthStart),
+    getSalesRevenue(bakery_id, dayStart(today), dayEnd(today)),
+    getSalesRevenue(bakery_id, dayStart(monthStart), dayEnd(today)),
     getLowStockCount(bakery_id),
     listLowStock(bakery_id, 4),
     listProduction(bakery_id, undefined, 5),
     user.perms?.users ? countPendingUsers(bakery_id) : Promise.resolve(0),
     getWeeklySales(bakery_id),
-    getPurchaseCostInRange(bakery_id, monthStart),
+    getPurchaseCostInRange(bakery_id, dayStart(monthStart), dayEnd(today)),
     listRecipes(bakery_id),
-    getSalesByRecipe(bakery_id, monthStart),
+    getSalesByRecipe(bakery_id, dayStart(monthStart), dayEnd(today)),
   ])
 
   const monthProfit = monthRev - monthCost

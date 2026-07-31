@@ -30,17 +30,25 @@ const STOCK = [
 /** croissant: (500×0.004 + 250×0.03) / 20 = 0.475 ; cake: (300×0.004 + 200×0.006) / 10 = 0.24 */
 const UNIT_COST = { r1: 0.475, r2: 0.24 }
 
-function installAggregates({ purchases = 0 } = {}) {
-  onRpc('sales_by_recipe', ({ p_to }: any) => p_to ? [] : [
-    { recipe_id: 'r1', qty: 6, revenue: 72 },
-    { recipe_id: 'r2', qty: 7, revenue: 45.5 },
-  ])
-  onRpc('sales_revenue', ({ p_to }: any) => (p_to ? 0 : 117.5))
+const today = () => new Date().toISOString().slice(0, 10)
+
+/**
+ * Every aggregate is now called twice — once for the period and once for the
+ * window it is compared against — so the fixtures answer on which window was
+ * asked for. The current one is the only one that ends today.
+ */
+const isCurrent = (p_to: any) => typeof p_to === 'string' && p_to.slice(0, 10) === today()
+
+function installAggregates({ purchases = 0, prevPurchases = purchases, prevRevenue = 0 } = {}) {
+  onRpc('sales_by_recipe', ({ p_to }: any) => isCurrent(p_to)
+    ? [{ recipe_id: 'r1', qty: 6, revenue: 72 }, { recipe_id: 'r2', qty: 7, revenue: 45.5 }]
+    : [{ recipe_id: 'r1', qty: 4, revenue: 48 }])
+  onRpc('sales_revenue', ({ p_to }: any) => (isCurrent(p_to) ? 117.5 : prevRevenue))
   onRpc('production_by_recipe', () => [
     { recipe_id: 'r1', recipe_name: 'كرواسون', output_unit: 'حبة', total: 40 },
   ])
   onRpc('sales_daily_totals', () => [])
-  onRpc('purchase_cost', () => purchases)
+  onRpc('purchase_cost', ({ p_to }: any) => (isCurrent(p_to) ? purchases : prevPurchases))
 }
 
 beforeEach(() => {
@@ -106,6 +114,62 @@ describe('buildReport', () => {
     assert.equal(rep.prodSummary[0].totalCost, 40 * UNIT_COST.r1)
   })
 
+  test('the comparison window is costed with the same unit costs', async () => {
+    installAggregates({ prevRevenue: 48 })
+    const rep = await buildReport('b1')
+    // Last period sold 4 croissants and nothing else.
+    assert.equal(rep.previous.cost, UNIT_COST.r1 * 4)
+    assert.equal(rep.previous.revenue, 48)
+    assert.equal(rep.previous.profit, 48 - UNIT_COST.r1 * 4)
+  })
+
+  test('reports the change against the comparison window', async () => {
+    installAggregates({ prevRevenue: 100, purchases: 200, prevPurchases: 100 })
+    const rep = await buildReport('b1')
+    assert.ok(Math.abs(rep.change.revenue! - ((117.5 - 100) / 100) * 100) < 1e-9)
+    assert.equal(rep.change.purchaseCost, 100)
+  })
+
+  test('a period with no prior figure reports no change rather than infinity', async () => {
+    installAggregates({ prevRevenue: 0, purchases: 0, prevPurchases: 0 })
+    const rep = await buildReport('b1')
+    assert.equal(rep.change.purchaseCost, null)
+    for (const v of Object.values(rep.change)) {
+      assert.ok(v === null || Number.isFinite(v), 'a change is a number or nothing')
+    }
+  })
+
+  test('every product carries its share of the period revenue', async () => {
+    installAggregates()
+    const rep = await buildReport('b1')
+    const sum = rep.data.reduce((s, d) => s + d.share, 0)
+    assert.ok(Math.abs(sum - 100) < 1e-9, `shares must add to 100, got ${sum}`)
+  })
+
+  test('flags a product priced below what it costs to make', async () => {
+    seed('recipes', [
+      ...RECIPES,
+      { id: 'r4', name: 'خسران', units_per_batch: 1, sell_price: 0.1, bakery_id: 'b1',
+        ingredients: [{ material: 'زبدة', amount: 100 }] },
+      { id: 'r5', name: 'بلا سعر', units_per_batch: 1, sell_price: 0, bakery_id: 'b1',
+        ingredients: [{ material: 'سكر', amount: 50 }] },
+    ])
+    installAggregates()
+    const rep = await buildReport('b1')
+    const kinds = new Map(rep.warnings.map(w => [w.name, w.kind]))
+    assert.equal(kinds.get('خسران'), 'below_cost')
+    assert.equal(kinds.get('بلا سعر'), 'no_price')
+    assert.ok(!kinds.has('كرواسون'), 'a healthy margin is not a warning')
+  })
+
+  test('the range travels with the report so the page can show what it covers', async () => {
+    installAggregates()
+    const rep = await buildReport('b1', { preset: 'week' })
+    assert.equal(rep.range.preset, 'week')
+    assert.equal(rep.range.days, 7)
+    assert.equal(rep.daily.length, 7, 'one chart point per day, gaps filled')
+  })
+
   test('an empty month produces zeroes, not NaN', async () => {
     onRpc('sales_by_recipe', () => [])
     onRpc('sales_revenue', () => 0)
@@ -115,6 +179,7 @@ describe('buildReport', () => {
     const rep = await buildReport('b1')
     for (const v of Object.values(rep.totals)) assert.ok(Number.isFinite(v as number), 'every total must be a number')
     assert.equal(rep.totals.avgMargin, 0)
+    assert.equal(rep.totals.productsSold, 0)
   })
 
   test('an ingredient missing from stock costs nothing rather than poisoning the total', async () => {
