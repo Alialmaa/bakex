@@ -2,45 +2,31 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { fmtDate, fromDayString } from '../lib/datetime'
 
 /**
- * Daily sales as a bar chart with real depth.
+ * Daily sales as an extruded bar chart.
  *
- * The bars are CSS cuboids: each one is a `preserve-3d` box holding a front, a
- * top and a right face, sitting in a scene with `perspective`. That is what
- * makes it read as 3D rather than as a picture of 3D — the faces are separate
- * planes and the perspective divides them differently across the scene.
+ * The depth is isometric, not perspective. A `perspective` scene was the
+ * obvious way to get 3D and it quietly broke the chart: projection displaces
+ * the top of a bar further sideways than its base, so every bar away from the
+ * centre leaned inward and rendered as a trapezoid instead of a rectangle. The
+ * further from centre, the worse the lean — and a bar chart whose bars are not
+ * the same shape cannot be read by eye, which is the only thing it is for.
  *
- * The scene turns on X only. A resting rotateY looked better in isolation and
- * ruined the chart: rotating about the vertical axis puts the baseline on a
- * slope, so a bar on the right sat higher than an equal bar on the left and the
- * one thing a bar chart exists to do — compare heights — no longer worked. The
- * measured slope was the whole width of the card; it is zero now.
+ * So each bar is extruded by the same fixed offset instead: a front rectangle,
+ * a top face skewed 45 degrees and a side face skewed the other way. Identical
+ * for every bar, at every position, at every height. Nothing is projected, so
+ * nothing keystones, the baseline is level by construction, and the labels sit
+ * exactly under the bars they name.
  *
- * For the same reason the axis labels live *inside* each cell rather than in a
- * row underneath: a flat row cannot follow bars that perspective has spread
- * apart, and the outermost label sat 45px from the bar it named. Inside the
- * cell they ride the same transform and are counter-rotated to stay upright.
- * The value labels go the other way — out of the scene entirely, into a static
- * gutter, because text on a tilted plane is blurred and hard to read.
- *
- * Two things silently destroy the depth, both learned the hard way:
- *
- *   * a `filter` or `backdrop-filter` anywhere up the tree forces
- *     `transform-style` back to `flat`;
- *   * so does a *running* transform animation — including one that only keeps
- *     running because it has a fill mode. Growth is animated on `height` here
- *     for exactly that reason.
- *
- * What responds to the pointer is the bar, not the scene. Tilting the whole
- * stage moved every bar to answer for one of them, and on the way it put the
- * baseline back on a slope. A hovered bar instead steps toward the viewer along
- * Z: perspective widens it — measured, 19.81px to 20.28px — and opens its side
- * face, which is the depth doing the work rather than a colour change standing
- * in for it. Nothing else on the chart moves.
+ * A side effect worth having: with no `perspective` and no `transform-style`
+ * there is nothing left to flatten, so the whole class of bugs around filters
+ * and running transform animations collapsing a 3D scene no longer applies
+ * here.
  */
 
-const BASE_TILT = 18
-/** How far a hovered bar steps toward the viewer. */
-const LIFT = 26
+/** The extrusion runs up and to the right at 45 degrees, so dx equals dy. */
+const DEPTH_RATIO = 0.34
+const DEPTH_MIN = 4
+const DEPTH_MAX = 13
 const GREEN = '#16a679'
 
 export interface DayPoint { day: string; total: number }
@@ -110,8 +96,6 @@ export default function SalesChart3D({
   points, lang, currency,
 }: { points: DayPoint[]; lang: string; currency: string }) {
   const isAR = lang === 'ar'
-  // A small pointer range: every degree of rotateY tips the baseline, so this
-  // is a wobble under the cursor, not a viewing angle.
   const trackRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const [hover, setHover] = useState<number | null>(null)
@@ -129,8 +113,7 @@ export default function SalesChart3D({
     return () => ro.disconnect()
   }, [])
 
-  // One frame after mount the bars go from flat to full height. The transition
-  // is on `height`, never on `transform` — see the note at the top.
+  // One frame after mount the bars go from flat to full height.
   useEffect(() => {
     const id = requestAnimationFrame(() => setGrown(true))
     // Once the entrance is over the stagger has to go, or hovering the last bar
@@ -142,7 +125,7 @@ export default function SalesChart3D({
   const n = Math.max(1, buckets.length)
   const slot = width / n
   const barW = Math.max(5, Math.min(38, slot * 0.6))
-  const depth = Math.max(6, Math.min(16, barW * 0.72))
+  const depth = Math.max(DEPTH_MIN, Math.min(DEPTH_MAX, barW * DEPTH_RATIO))
 
   const peak = Math.max(...buckets.map(b => b.total), 0)
   const scale = niceMax(peak)
@@ -175,7 +158,6 @@ export default function SalesChart3D({
 
       <div className="plot">
 
-        {/* Values live outside the 3D scene: text on a tilted plane is blurred. */}
         <div className="yaxis">
           {gridlines.map(g => (
             <span key={g} className="yval num" style={{ bottom: `${g * 100}%` }}>
@@ -184,51 +166,50 @@ export default function SalesChart3D({
           ))}
         </div>
 
-        <div className="scene" onMouseLeave={() => setHover(null)}>
-          <div className="stage">
+        <div className="stage" onMouseLeave={() => setHover(null)}>
+          {/* Room above and to the side for the extrusion to occupy without
+              pushing the bars off their own scale. */}
+          <div className="grid" style={{ top: depth, insetInlineEnd: depth }}>
+            {gridlines.map(g => (
+              <div key={g} className={`gline${g === 0 ? ' base' : ''}`} style={{ bottom: `${g * 100}%` }} />
+            ))}
+          </div>
 
-            <div className="grid">
-              {gridlines.map(g => (
-                <div key={g} className={`gline${g === 0 ? ' base' : ''}`} style={{ bottom: `${g * 100}%` }} />
-              ))}
-            </div>
+          <div className="track" ref={trackRef} style={{ top: depth, insetInlineEnd: depth }}>
+            {buckets.map((b, i) => {
+              const h = (b.total / scale) * 100
+              const isHot = hover === i
+              return (
+                <div key={i} className="cell" onMouseEnter={() => setHover(i)}>
+                  {/* A day with no sales draws nothing. A zero-height box still
+                      painted its top and side faces, which read as scratches
+                      along the baseline. */}
+                  {b.total > 0 && (
+                    <div
+                      className={`bar${isHot ? ' hot' : ''}`}
+                      style={{
+                        width: barW,
+                        height: grown ? `${h}%` : 0,
+                        transitionDelay: settled ? '0ms' : `${Math.min(i * 18, 420)}ms`,
+                      }}
+                    >
+                      <div className="front" />
+                      <div className="top" style={{ height: depth }} />
+                      <div className="side" style={{ width: depth }} />
+                    </div>
+                  )}
 
-            <div className="track" ref={trackRef}>
-              {buckets.map((b, i) => {
-                const h = (b.total / scale) * 100
-                const isHot = hover === i
-                return (
-                  <div key={i} className="cell" onMouseEnter={() => setHover(i)}>
-                    {/* A day with no sales draws nothing. Rendering a zero-height
-                        box still painted its top and side faces, which read as
-                        scratches along the baseline. */}
-                    {b.total > 0 && (
-                      <div
-                        className={`bar${isHot ? ' hot' : ''}`}
-                        style={{
-                          width: barW,
-                          height: grown ? `${h}%` : 0,
-                          transitionDelay: settled ? '0ms' : `${Math.min(i * 18, 420)}ms`,
-                        }}
-                      >
-                        <div className="face front" style={{ transform: `translateZ(${depth / 2}px)` }} />
-                        <div className="face top" style={{ height: depth, transform: `translateY(${-depth / 2}px) rotateX(90deg)` }} />
-                        <div className="face side" style={{ width: depth, transform: `translateX(${barW - depth / 2}px) rotateY(90deg)` }} />
-                      </div>
-                    )}
+                  {i % labelEvery === 0 && <span className="xlabel num">{b.label}</span>}
 
-                    {i % labelEvery === 0 && <span className="xlabel num">{b.label}</span>}
-
-                    {isHot && (
-                      <div className="tip" style={{ bottom: `${h}%` }}>
-                        <div className="tip-day">{b.title}</div>
-                        <div className="tip-val num">{b.total.toLocaleString('en-US', { maximumFractionDigits: 0 })} {currency}</div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                  {isHot && (
+                    <div className="tip" style={{ bottom: `${h}%` }}>
+                      <div className="tip-day">{b.title}</div>
+                      <div className="tip-val num">{b.total.toLocaleString('en-US', { maximumFractionDigits: 0 })} {currency}</div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -253,71 +234,57 @@ export default function SalesChart3D({
           font-size: 9.5px; color: #b4c0cf; font-weight: 600; white-space: nowrap;
         }
 
-        /* The perspective lives here and nothing between it and the faces may
-           flatten: no filter, no opacity animation on a transformed ancestor. */
-        .scene {
-          flex: 1; min-width: 0;
-          perspective: 1900px;
-          perspective-origin: 50% 100%;
-          padding-bottom: 26px;
-        }
-        .stage {
-          position: relative;
-          height: 190px;
-          transform-style: preserve-3d;
-          /* Fixed. rotateX only, and nothing rotates it further — see the note
-             at the top of this file. */
-          transform: rotateX(${BASE_TILT}deg);
-        }
-
-        .grid { position: absolute; inset: 0; transform-style: preserve-3d }
+        .stage { position: relative; flex: 1; min-width: 0; height: 190px; padding-bottom: 26px }
+        .grid { position: absolute; inset-inline-start: 0; bottom: 26px }
         .gline { position: absolute; left: 0; right: 0; height: 1px; background: #eef2f7 }
         .gline.base { background: #dde3ea }
 
         .track {
-          position: absolute; inset: 0;
+          position: absolute; inset-inline-start: 0; bottom: 26px;
           display: flex; align-items: flex-end;
-          transform-style: preserve-3d;
         }
         .cell {
           flex: 1 1 0; min-width: 0; height: 100%;
           display: flex; align-items: flex-end; justify-content: center;
           position: relative;
-          transform-style: preserve-3d;
         }
 
         .bar {
           position: relative;
-          transform-style: preserve-3d;
-          /* Growth is on height, not transform: a running transform *animation*
-             flattens every child face into one plane. A transform transition
-             does not — the top face still measures 4.8px mid-hover — so the
-             lift below is safe. */
-          transition: height 0.62s cubic-bezier(0.2, 0.75, 0.25, 1),
-                      transform 0.18s ease-out;
+          transition: height 0.62s cubic-bezier(0.2, 0.75, 0.25, 1);
         }
-        .face { position: absolute }
-        .front { inset: 0; background: linear-gradient(180deg, #25c795, #159c72) }
-        .top { top: 0; left: 0; width: 100%; background: #6ceecb }
-        .side { top: 0; left: 0; height: 100%; background: #0e6f53 }
-        .bar.hot { transform: translateZ(${LIFT}px) }
-        .bar.hot .front { background: linear-gradient(180deg, #16b184, #0d8a63) }
-        .bar.hot .top { background: #8bf5d8 }
-        .bar.hot .side { background: #0a5943 }
+        .front {
+          position: absolute; inset: 0;
+          background: linear-gradient(180deg, #29cd9c, #14976e);
+        }
+        /* Skewed 45deg about its bottom-left corner, which turns the rectangle
+           into exactly the parallelogram the extrusion needs — the same shape
+           whatever the bar's height or position. */
+        .top {
+          position: absolute; bottom: 100%; left: 0; width: 100%;
+          background: #66e8c1;
+          transform: skewX(-45deg);
+          transform-origin: bottom left;
+        }
+        .side {
+          position: absolute; top: 0; left: 100%; height: 100%;
+          background: #0d7d5c;
+          transform: skewY(-45deg);
+          transform-origin: bottom left;
+        }
+        .bar.hot .front { background: linear-gradient(180deg, #12b287, #0a7d5b) }
+        .bar.hot .top { background: #8df3d5 }
+        .bar.hot .side { background: #085f45 }
 
-        /* Inside the cell so it tracks its own bar, counter-rotated so the
-           digits stay upright. */
         .xlabel {
-          position: absolute; top: 100%; left: 50%; margin-top: 7px;
+          position: absolute; top: 100%; left: 50%; margin-top: 8px;
+          transform: translateX(-50%);
           font-size: 9.5px; color: #9ca3af; font-weight: 600; white-space: nowrap;
-          transform: translateX(-50%) rotateX(-${BASE_TILT}deg);
-          transform-origin: top center;
         }
 
         .tip {
-          position: absolute; left: 50%;
-          transform: translateX(-50%) translateZ(40px) rotateX(-${BASE_TILT}deg);
-          margin-bottom: 10px;
+          position: absolute; left: 50%; transform: translateX(-50%);
+          margin-bottom: 12px;
           background: #0b0f1a; color: #fff;
           border-radius: 8px; padding: 6px 10px;
           white-space: nowrap; pointer-events: none;
