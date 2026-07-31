@@ -7,6 +7,7 @@ import { MetricCard, Icons, EditIcon, TrashIcon } from '../components/Metric'
 import { T } from '../lib/translations'
 import { useLang } from '../lib/useLang'
 import { fmtDateLong, fmtTime, fromDayString } from '../lib/datetime'
+import { businessToday, dayStart, dayEnd, monthStart as monthStartOf, isOnDay } from '../lib/businessDay'
 
 export default function ProducePage({ user, initialRecipes, initialStock, initialLog, initialMonthDates }: any) {
   const { lang, setLang } = useLang()
@@ -18,18 +19,17 @@ export default function ProducePage({ user, initialRecipes, initialStock, initia
   const [editLog, setEditLog] = useState<any>(null)
   const [editQty, setEditQty] = useState('')
   const [tab, setTab] = useState<'produce' | 'log'>('produce')
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState<string>(businessToday())
   const [filteredLog, setFilteredLog] = useState<any[]>([])
   const [loadingLog, setLoadingLog] = useState(false)
   const t = T[lang]
 
   // Build calendar for current month
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = today.getMonth()
+  const todayStr = businessToday()
+  const year = Number(todayStr.slice(0, 4))
+  const month = Number(todayStr.slice(5, 7)) - 1
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const firstDay = new Date(year, month, 1).getDay()
-  const todayStr = today.toISOString().split('T')[0]
 
   // Dates that have production
   const activeDates = new Set((initialMonthDates || []).map((l: any) => l.created_at?.split('T')[0]))
@@ -395,15 +395,15 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   if (isRedirect(guard)) return guard
   const { user } = guard
 
-  const today = new Date().toISOString().split('T')[0]
-  const monthStart = new Date().toISOString().slice(0, 7) + '-01'
+  const today = businessToday()
+  const monthStart = monthStartOf(today)
 
   const bid = user.bakery_id
   const [{ data: recipes }, { data: stock }, { data: todayLog }, { data: monthDates }] = await Promise.all([
     bid ? supabaseAdmin.from('recipes').select('*').eq('bakery_id', bid).order('name') : supabaseAdmin.from('recipes').select('*').order('name'),
     bid ? supabaseAdmin.from('stock').select('*').eq('bakery_id', bid) : supabaseAdmin.from('stock').select('*'),
-    bid ? supabaseAdmin.from('production_log').select('*').eq('bakery_id', bid).gte('created_at', today + 'T00:00:00').order('created_at', { ascending: false }) : supabaseAdmin.from('production_log').select('*').gte('created_at', today + 'T00:00:00').order('created_at', { ascending: false }),
-    bid ? supabaseAdmin.from('production_log').select('created_at').eq('bakery_id', bid).gte('created_at', monthStart) : supabaseAdmin.from('production_log').select('created_at').gte('created_at', monthStart),
+    bid ? supabaseAdmin.from('production_log').select('*').eq('bakery_id', bid).gte('created_at', dayStart(today)).order('created_at', { ascending: false }) : supabaseAdmin.from('production_log').select('*').gte('created_at', dayStart(today)).order('created_at', { ascending: false }),
+    bid ? supabaseAdmin.from('production_log').select('created_at').eq('bakery_id', bid).gte('created_at', dayStart(monthStart)) : supabaseAdmin.from('production_log').select('created_at').gte('created_at', dayStart(monthStart)),
   ])
 
   return { props: { user, initialRecipes: recipes || [], initialStock: stock || [], initialLog: todayLog || [], initialMonthDates: monthDates || [] } }

@@ -7,8 +7,10 @@ import { MetricCard, Icons, TrashIcon } from '../components/Metric'
 import { T } from '../lib/translations'
 import { useLang } from '../lib/useLang'
 import { fmtDate, fmtTime } from '../lib/datetime'
+import { businessToday, dayStart, dayEnd } from '../lib/businessDay'
+import { getSalesRevenue } from '../lib/db/sales'
 
-export default function SalesPage({ user, initialRecipes, initialSales }: any) {
+export default function SalesPage({ user, initialRecipes, initialSales, initialTodayRev, initialTodayCount }: any) {
   const { lang, setLang } = useLang()
   const [recipes] = useState<any[]>(initialRecipes || [])
   const [sales, setSales] = useState<any[]>(initialSales || [])
@@ -17,7 +19,12 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
     Object.fromEntries((initialRecipes || []).map((r: any) => [r.id, r.sell_price || 0]))
   )
   const [saving, setSaving] = useState(false)
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
+  const today = businessToday()
+  const [saleDate, setSaleDate] = useState(today)
+  // Both come from the server, over the whole day. They used to be derived from
+  // the last 50 rows on screen, so a busy day under-reported itself.
+  const [todayRev, setTodayRev] = useState<number>(initialTodayRev || 0)
+  const [todayCount, setTodayCount] = useState<number>(initialTodayCount || 0)
   const t = T[lang]
 
   const recordSales = async () => {
@@ -31,12 +38,18 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entries, date: saleDate }),
     })
-    if (res.ok) { const d = await res.json(); setSales([...d, ...sales]); setQtys({}) }
+    if (res.ok) {
+      const d = await res.json()
+      setSales([...d, ...sales])
+      if (saleDate === today) {
+        setTodayRev(v => v + entries.reduce((sum, e) => sum + e.qty * e.unit_price, 0))
+        setTodayCount(v => v + entries.length)
+      }
+      setQtys({})
+    }
     setSaving(false)
   }
 
-  const today = new Date().toISOString().split('T')[0]
-  const todayRev = sales.filter(s => s.created_at?.startsWith(today)).reduce((s: number, x: any) => s + x.total, 0)
 
   if (recipes.length === 0) {
     return (
@@ -61,9 +74,9 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
             icon={Icons.cart} tone="green"
           />
           <MetricCard
-            label={lang === 'ar' ? 'الفواتير' : 'Transactions'}
-            value={sales.length}
-            sub={lang === 'ar' ? 'آخر 50 عملية' : 'last 50 entries'}
+            label={lang === 'ar' ? 'عمليات اليوم' : "Today's Entries"}
+            value={todayCount}
+            sub={lang === 'ar' ? 'سطر بيع مسجّل اليوم' : 'sale lines recorded today'}
             icon={Icons.receipt} tone="blue"
           />
           <MetricCard
@@ -83,11 +96,11 @@ export default function SalesPage({ user, initialRecipes, initialSales }: any) {
             <input
               type="date"
               value={saleDate}
-              max={new Date().toISOString().split('T')[0]}
+              max={today}
               onChange={e => setSaleDate(e.target.value)}
               style={{ padding: '6px 10px', borderRadius: 8, border: '0.5px solid #d4d4d4', fontSize: 13, fontFamily: 'inherit', width: 'auto' }}
             />
-            {saleDate !== new Date().toISOString().split('T')[0] && (
+            {saleDate !== today && (
               <span className="tag tag-yellow">{lang === 'ar' ? 'تاريخ سابق' : 'Past date'}</span>
             )}
           </div>
@@ -156,9 +169,29 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
   if (isRedirect(guard)) return guard
   const { user } = guard
   const bid = user.bakery_id
-  const [{ data: recipes }, { data: sales }] = await Promise.all([
+  const today = businessToday()
+  const from = dayStart(today)
+  const to = dayEnd(today)
+
+  // The list stays capped — it is a display of recent entries. The two figures
+  // above it are counted and summed over the whole day in the database, because
+  // a card labelled "today" must not silently mean "the last 50 rows".
+  const [{ data: recipes }, { data: sales }, { count: todayCount }, todayRev] = await Promise.all([
     bid ? supabaseAdmin.from('recipes').select('*').eq('bakery_id', bid).order('name') : supabaseAdmin.from('recipes').select('*').order('name'),
     bid ? supabaseAdmin.from('sales').select('*').eq('bakery_id', bid).order('created_at', { ascending: false }).limit(50) : supabaseAdmin.from('sales').select('*').order('created_at', { ascending: false }).limit(50),
+    bid
+      ? supabaseAdmin.from('sales').select('*', { count: 'exact', head: true }).eq('bakery_id', bid).gte('created_at', from).lte('created_at', to)
+      : Promise.resolve({ count: 0 }),
+    bid ? getSalesRevenue(bid, from, to) : Promise.resolve(0),
   ])
-  return { props: { user, initialRecipes: recipes || [], initialSales: sales || [] } }
+
+  return {
+    props: {
+      user,
+      initialRecipes: recipes || [],
+      initialSales: sales || [],
+      initialTodayRev: todayRev ?? 0,
+      initialTodayCount: todayCount ?? 0,
+    },
+  }
 }

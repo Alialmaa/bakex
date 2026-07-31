@@ -3,6 +3,7 @@ import type { GetServerSideProps } from 'next'
 import { requirePage, isRedirect } from '../../lib/auth'
 import { supabaseAdmin } from '../../lib/supabase'
 import { fmtDate, fmtTime } from '../../lib/datetime'
+import { businessToday, dayStart, dayEnd, monthStart as monthStartOf, isOnDay } from '../../lib/businessDay'
 
 interface CartItem { id: string; name: string; price: number; qty: number }
 interface Invoice {
@@ -106,9 +107,9 @@ export default function CashierPage({ user, products, bakeryName, bakerySettings
     (inv.customer_name || '').toLowerCase().includes(invoiceSearch.toLowerCase())
   )
 
-  const todayInvoices = invoices.filter(inv =>
-    inv.created_at.startsWith(new Date().toISOString().split('T')[0])
-  )
+  // startsWith on the UTC date counted the wrong day for anything rung up
+  // between midnight and 3am, which is when a bakery is busiest.
+  const todayInvoices = invoices.filter(inv => isOnDay(inv.created_at, businessToday()))
   const todayTotal = todayInvoices.reduce((s, inv) => s + Number(inv.total), 0)
 
   return (

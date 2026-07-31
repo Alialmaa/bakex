@@ -109,7 +109,24 @@ the current month. Bad input falls back to month-to-date rather than erroring,
 and a custom range is capped at 731 days. Bounds are inclusive of both end days
 (`fromBound`/`toBound`) because the SQL aggregates compare `>= p_from AND
 <= p_to` — passing a bare date as `p_to` silently drops that day's sales.
-Everything is UTC, matching the day-cutting comment in `004`.
+
+## "Today" is the bakery's day, not UTC's
+
+**Never derive a calendar date from `toISOString()`.** Riyadh is UTC+3, so from
+midnight to 3am the UTC date is still yesterday's — the hours a bakery is busiest.
+`lib/businessDay.ts` is the only place that converts between instants and dates:
+
+| Use | Instead of |
+|---|---|
+| `businessToday()` | `new Date().toISOString().split('T')[0]` |
+| `dayStart(d)` / `dayEnd(d)` | `d + 'T00:00:00'` / a bare date as an upper bound |
+| `dayStamp(d)` | `new Date(d + 'T12:00:00')` — parsed in the *server's* zone |
+| `isOnDay(instant, d)` | `created_at.startsWith(d)` |
+
+`BUSINESS_OFFSET` is a fixed `+03:00` because Saudi Arabia has never observed
+daylight saving. The SQL side must agree: `sales_daily_totals` buckets with
+`AT TIME ZONE 'Asia/Riyadh'` since `006`, so **apply 006 before deploying** or
+the chart buckets in UTC while the cards above it are bounded in Riyadh time.
 
 ## Testing without a real database
 

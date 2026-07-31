@@ -142,11 +142,20 @@ describe('resolveRange — untrusted input', () => {
 })
 
 describe('the bounds handed to Postgres', () => {
-  test('cover the whole of both end days', () => {
+  test('cover the whole of both end days, in the bakery\'s timezone', () => {
     // The aggregates compare with `>= p_from AND <= p_to`. A bare date as the
-    // upper bound would mean midnight, dropping everything sold that day.
-    assert.equal(fromBound('2026-07-01'), '2026-07-01T00:00:00.000Z')
-    assert.equal(toBound('2026-07-15'), '2026-07-15T23:59:59.999Z')
+    // upper bound would mean midnight, dropping everything sold that day — and
+    // a UTC midnight would start the day three hours late in Riyadh.
+    assert.equal(fromBound('2026-07-01'), '2026-06-30T21:00:00.000Z')
+    assert.equal(toBound('2026-07-15'), '2026-07-15T20:59:59.999Z')
+  })
+
+  test('a sale at 1am counts toward the day it was rung up', () => {
+    // 2026-07-15T01:30 in Riyadh is 2026-07-14T22:30 UTC. Bounding the 15th in
+    // UTC would file it under the 14th — the bug this replaced.
+    const sale = Date.parse('2026-07-14T22:30:00.000Z')
+    assert.ok(sale >= Date.parse(fromBound('2026-07-15')))
+    assert.ok(sale <= Date.parse(toBound('2026-07-15')))
   })
 
   test('a period and its comparison window do not overlap by an instant', () => {

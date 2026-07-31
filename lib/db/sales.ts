@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../supabase'
+import { businessToday, dayStamp, addDays } from '../businessDay'
 
 /** Rows are for display; totals should come from the aggregate helpers below. */
 const LIST_LIMIT = 500
@@ -46,9 +47,11 @@ export interface SaleEntry {
 }
 
 export async function createSales(bakery_id: string, entries: SaleEntry[], sold_by: string, date?: string) {
-  const created_at = date
-    ? new Date(date + 'T12:00:00').toISOString()
-    : new Date().toISOString()
+  // A sale recorded *for* a date is stamped midday in the bakery's timezone, so
+  // it lands inside that day whatever the server's own timezone is. The bare
+  // `new Date(date + 'T12:00:00')` this replaces was parsed in the server's
+  // local time — UTC on Vercel, something else on a laptop.
+  const created_at = date ? dayStamp(date) : new Date().toISOString()
 
   // Each column is set explicitly. This used to spread the caller's object
   // (`{ ...e }`), which handed the client a direct write into every column of
@@ -120,7 +123,6 @@ export async function getDailySales(
 
 /** The last 7 days, ending today. The dashboard's chart. */
 export async function getWeeklySales(bakery_id: string | null): Promise<{ day: string; total: number }[]> {
-  const today = new Date().toISOString().slice(0, 10)
-  const from = new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10)
-  return getDailySales(bakery_id, from, today)
+  const today = businessToday()
+  return getDailySales(bakery_id, addDays(today, -6), today)
 }

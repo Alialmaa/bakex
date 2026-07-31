@@ -1,17 +1,17 @@
 /**
  * The period a report covers, and the period it is compared against.
  *
- * Everything here is UTC. migrations/004 cuts days in UTC on purpose — the
- * comment on `sales_daily_totals` explains why — and every date the app sends
- * comes from toISOString(), so doing the arithmetic in local time here would
- * shift the boundaries against the database by three hours in Riyadh and change
- * figures users have already seen.
+ * Days are the bakery's days, not UTC's — see lib/businessDay.ts. The two are
+ * three hours apart, which is the difference between a sale rung up at 1am
+ * counting toward last night or tonight.
  *
  * Dates are bare `YYYY-MM-DD` and both ends are inclusive, because that is what
  * a person means by "1 July to 31 July". The aggregates compare a timestamptz
  * with `>= p_from AND <= p_to`, so the bounds are widened to the first and last
  * instant of those days by fromBound/toBound rather than by the caller.
  */
+
+import { businessToday, dayStart, dayEnd } from './businessDay'
 
 export const PRESETS = ['today', 'week', 'month', 'quarter', 'year'] as const
 export type Preset = (typeof PRESETS)[number] | 'custom'
@@ -39,9 +39,12 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/
 const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 const ms = (d: string) => Date.parse(`${d}T00:00:00.000Z`)
 
-/** Widened to the whole day, so `to` really includes what happened on that date. */
-export const fromBound = (d: string) => `${d}T00:00:00.000Z`
-export const toBound = (d: string) => `${d}T23:59:59.999Z`
+/**
+ * Widened to the whole business day, so `to` really includes what happened on
+ * that date and `from` does not start three hours late.
+ */
+export const fromBound = (d: string) => dayStart(d)
+export const toBound = (d: string) => dayEnd(d)
 
 const daysBetween = (from: string, to: string) => Math.round((ms(to) - ms(from)) / DAY) + 1
 
@@ -88,9 +91,11 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
  * aggregate a decade.
  */
 export function resolveRange(input: RangeInput = {}, now: Date = new Date()): ResolvedRange {
-  const today = iso(now.getTime())
-  const y = now.getUTCFullYear()
-  const m = now.getUTCMonth()
+  const today = businessToday(now)
+  // Derived from the business date, not from `now` directly: at 1am on the 1st
+  // of a month the UTC month is still the previous one.
+  const y = Number(today.slice(0, 4))
+  const m = Number(today.slice(5, 7)) - 1
 
   const rawPreset = first(input.preset)
   const rawFrom = first(input.from)

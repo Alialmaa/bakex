@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../../../lib/supabase'
 import { createSales } from '../../../lib/db/sales'
 import { adjustStockQty } from '../../../lib/db/stock'
 import { apiError } from '../../../lib/apiError'
+import { businessToday, dayStart, dayEnd, monthStart as monthStartOf, isOnDay } from '../../../lib/businessDay'
 
 const MAX_ITEMS = 200
 const MAX_QTY = 1_000_000
@@ -103,8 +104,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Generate invoice number: INV-YYYYMMDD-XXXX
     // Uses an atomic DB counter (next_invoice_seq) so concurrent sales never collide.
-    const today = new Date()
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
+    // The bakery's date: an invoice printed at 1am used to carry yesterday's
+    // number, and the daily sequence reset three hours after the day did.
+    const dateStr = businessToday().replace(/-/g, '')
 
     const { data: seqNum, error: seqErr } = await supabaseAdmin
       .rpc('next_invoice_seq', { p_bakery_id: bakery_id, p_date_key: dateStr })
