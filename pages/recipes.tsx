@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ImportRecipes from '../components/ImportRecipes'
 import type { GetServerSideProps } from 'next'
 import { requirePage, isRedirect } from '../lib/auth'
 import { supabaseAdmin } from '../lib/supabase'
@@ -16,6 +17,8 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
   const [form, setForm] = useState({
     name: '',
     batch_unit: 'صينية',      // e.g. صينية / وجبة / دفعة
@@ -137,10 +140,41 @@ export default function RecipesPage({ user, initialRecipes, initialStock }: any)
 
         <div className="page-head">
           <div className="page-head-sub">{lang === 'ar' ? 'أدر وصفاتك ومكوّناتها وأسعار بيعها' : 'Manage recipes, ingredients and selling prices'}</div>
-          <button className="btn btn-primary" onClick={() => { reset(); setShowForm(!showForm) }}>
-            {showForm ? (lang === 'ar' ? 'إلغاء' : 'Cancel') : (lang === 'ar' ? '+ وصفة جديدة' : '+ New Recipe')}
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {importMsg && (
+              <span style={{ fontSize: 12.5, color: '#0f7a5c', background: 'rgba(22,166,121,.1)', borderRadius: 8, padding: '6px 11px', fontWeight: 600 }}>
+                {importMsg}
+              </span>
+            )}
+            {/* Recipes are the second wall of typing after the materials. */}
+            <button className="btn" onClick={() => { setImportMsg(''); setImporting(true) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              {lang === 'ar' ? 'استيراد من ملف' : 'Import from file'}
+            </button>
+            <button className="btn btn-primary" onClick={() => { reset(); setShowForm(!showForm) }}>
+              {showForm ? (lang === 'ar' ? 'إلغاء' : 'Cancel') : (lang === 'ar' ? '+ وصفة جديدة' : '+ New Recipe')}
+            </button>
+          </div>
         </div>
+
+        {importing && (
+          <ImportRecipes
+            lang={lang}
+            materials={stock.map(m => m.name)}
+            existingNames={recipes.map(r => r.name)}
+            onClose={() => setImporting(false)}
+            onDone={async r => {
+              setImporting(false)
+              const res = await fetch('/api/recipes')
+              if (res.ok) setRecipes(await res.json())
+              setImportMsg(lang === 'ar'
+                ? `تمت الإضافة: ${r.added} · التحديث: ${r.updated}${r.skipped ? ` · تخطّي: ${r.skipped}` : ''}`
+                : `Added ${r.added} · updated ${r.updated}${r.skipped ? ` · skipped ${r.skipped}` : ''}`)
+            }}
+          />
+        )}
 
         {showForm && (
           <div className="card">

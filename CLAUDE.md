@@ -183,6 +183,19 @@ on `(bakery_id, name)` would otherwise reject the whole batch.
 **An import never deletes.** It adds and, in `update` mode, overwrites; a
 material absent from the file is left alone. A first upload is usually partial.
 
+`lib/importRecipes.ts` reads the long form — a row per ingredient, the recipe
+name repeated down its block — because a flat sheet cannot nest. Recipe-level
+columns (`units_per_batch`, `sell_price`, `output_unit`) are taken from the
+first row of a block that fills them in and a later blank never erases them.
+`units_per_batch` falls back to 1, never 0, or the cost divides by zero.
+
+**An ingredient naming a material that is not in stock costs zero.**
+`buildReport` multiplies each ingredient by its stock price and skips what it
+cannot find, so a misspelt material does not fail — it understates that recipe's
+cost, its margin and every total above it. The preview lists those names before
+anything is saved; the route goes through `createRecipe`/`updateRecipe` and
+`requireIngredients`, so an imported recipe is identical to a typed one.
+
 ## Post-deploy smoke test
 
 Log in → dashboard → reports → **produce a batch** → record a purchase → edit a
