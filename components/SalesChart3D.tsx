@@ -1,30 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useTilt } from '../lib/useTilt'
 import { fmtDate, fromDayString } from '../lib/datetime'
 
 /**
- * Daily sales as a bar chart with real depth.
+ * Daily sales as an extruded bar chart.
  *
- * The bars are CSS cuboids: each one is a `preserve-3d` box holding a front, a
- * top and a right face, sitting in a scene with `perspective` that tilts toward
- * the pointer. That is what makes it read as 3D rather than as a picture of 3D
- * — the faces are separate planes and the perspective divides them differently
- * as the stage rotates.
+ * The depth is isometric, not perspective. A `perspective` scene was the
+ * obvious way to get 3D and it quietly broke the chart: projection displaces
+ * the top of a bar further sideways than its base, so every bar away from the
+ * centre leaned inward and rendered as a trapezoid instead of a rectangle. The
+ * further from centre, the worse the lean — and a bar chart whose bars are not
+ * the same shape cannot be read by eye, which is the only thing it is for.
  *
- * Two things silently destroy this, both learned the hard way:
+ * So each bar is extruded by the same fixed offset instead: a front rectangle,
+ * a top face skewed 45 degrees and a side face skewed the other way. Identical
+ * for every bar, at every position, at every height. Nothing is projected, so
+ * nothing keystones, the baseline is level by construction, and the labels sit
+ * exactly under the bars they name.
  *
- *   * a `filter` or `backdrop-filter` anywhere up the tree forces
- *     `transform-style` back to `flat`;
- *   * so does a *running* transform animation — including one that only keeps
- *     running because it has a fill mode. Growth is animated on `height` here
- *     for exactly that reason.
- *
- * Touch devices and anyone asking for reduced motion get the same chart at the
- * resting angle, without the pointer tracking.
+ * A side effect worth having: with no `perspective` and no `transform-style`
+ * there is nothing left to flatten, so the whole class of bugs around filters
+ * and running transform animations collapsing a 3D scene no longer applies
+ * here.
  */
 
-const BASE_TILT_X = 16
-const BASE_TILT_Y = -11
+/** The extrusion runs up and to the right at 45 degrees, so dx equals dy. */
+const DEPTH_RATIO = 0.34
+const DEPTH_MIN = 4
+const DEPTH_MAX = 13
 const GREEN = '#16a679'
 
 export interface DayPoint { day: string; total: number }
@@ -94,11 +96,11 @@ export default function SalesChart3D({
   points, lang, currency,
 }: { points: DayPoint[]; lang: string; currency: string }) {
   const isAR = lang === 'ar'
-  const { ref, onMove, onLeave } = useTilt(7, BASE_TILT_X, BASE_TILT_Y)
   const trackRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const [hover, setHover] = useState<number | null>(null)
   const [grown, setGrown] = useState(false)
+  const [settled, setSettled] = useState(false)
 
   const { buckets, grain } = useMemo(() => bucketise(points, lang), [points, lang])
 
@@ -111,17 +113,19 @@ export default function SalesChart3D({
     return () => ro.disconnect()
   }, [])
 
-  // One frame after mount the bars go from flat to full height. The transition
-  // is on `height`, never on `transform` — see the note at the top.
+  // One frame after mount the bars go from flat to full height.
   useEffect(() => {
     const id = requestAnimationFrame(() => setGrown(true))
-    return () => cancelAnimationFrame(id)
+    // Once the entrance is over the stagger has to go, or hovering the last bar
+    // would wait out its own entrance delay before it moved.
+    const t = setTimeout(() => setSettled(true), 1200)
+    return () => { cancelAnimationFrame(id); clearTimeout(t) }
   }, [])
 
   const n = Math.max(1, buckets.length)
   const slot = width / n
-  const barW = Math.max(5, Math.min(44, slot - Math.min(10, slot * 0.32)))
-  const depth = Math.max(5, Math.min(19, barW * 0.5))
+  const barW = Math.max(5, Math.min(38, slot * 0.6))
+  const depth = Math.max(DEPTH_MIN, Math.min(DEPTH_MAX, barW * DEPTH_RATIO))
 
   const peak = Math.max(...buckets.map(b => b.total), 0)
   const scale = niceMax(peak)
@@ -152,35 +156,53 @@ export default function SalesChart3D({
         </span>
       </div>
 
-      <div className="scene" onMouseMove={onMove} onMouseLeave={() => { onLeave(); setHover(null) }}>
-        <div className="stage" ref={ref}>
+      <div className="plot">
 
-          {/* Gridlines sit behind the bars, on their own plane. */}
-          <div className="grid">
+        <div className="yaxis">
+          {gridlines.map(g => (
+            <span key={g} className="yval num" style={{ bottom: `${g * 100}%` }}>
+              {Math.round(scale * g).toLocaleString('en-US')}
+            </span>
+          ))}
+        </div>
+
+        <div className="stage" onMouseLeave={() => setHover(null)}>
+          {/* Room above and to the side for the extrusion to occupy without
+              pushing the bars off their own scale. */}
+          <div className="grid" style={{ top: depth, insetInlineEnd: depth }}>
             {gridlines.map(g => (
-              <div key={g} className="gridline" style={{ bottom: `${g * 100}%` }}>
-                <span className="gridval num">{Math.round(scale * g).toLocaleString('en-US')}</span>
-              </div>
+              <div key={g} className={`gline${g === 0 ? ' base' : ''}`} style={{ bottom: `${g * 100}%` }} />
             ))}
           </div>
 
-          <div className="track" ref={trackRef}>
+          <div className="track" ref={trackRef} style={{ top: depth, insetInlineEnd: depth }}>
             {buckets.map((b, i) => {
               const h = (b.total / scale) * 100
               const isHot = hover === i
               return (
                 <div key={i} className="cell" onMouseEnter={() => setHover(i)}>
-                  <div
-                    className={`bar${isHot ? ' hot' : ''}`}
-                    style={{ width: barW, height: grown ? `${h}%` : 0, transitionDelay: `${Math.min(i * 18, 420)}ms` }}
-                  >
-                    <div className="face front" style={{ transform: `translateZ(${depth / 2}px)` }} />
-                    <div className="face top" style={{ height: depth, transform: `translateY(${-depth / 2}px) rotateX(90deg)` }} />
-                    <div className="face side" style={{ width: depth, transform: `translateX(${barW - depth / 2}px) rotateY(90deg)` }} />
-                  </div>
+                  {/* A day with no sales draws nothing. A zero-height box still
+                      painted its top and side faces, which read as scratches
+                      along the baseline. */}
+                  {b.total > 0 && (
+                    <div
+                      className={`bar${isHot ? ' hot' : ''}`}
+                      style={{
+                        width: barW,
+                        height: grown ? `${h}%` : 0,
+                        transitionDelay: settled ? '0ms' : `${Math.min(i * 18, 420)}ms`,
+                      }}
+                    >
+                      <div className="front" />
+                      <div className="top" style={{ height: depth }} />
+                      <div className="side" style={{ width: depth }} />
+                    </div>
+                  )}
+
+                  {i % labelEvery === 0 && <span className="xlabel num">{b.label}</span>}
 
                   {isHot && (
-                    <div className="tip">
+                    <div className="tip" style={{ bottom: `${h}%` }}>
                       <div className="tip-day">{b.title}</div>
                       <div className="tip-val num">{b.total.toLocaleString('en-US', { maximumFractionDigits: 0 })} {currency}</div>
                     </div>
@@ -189,27 +211,11 @@ export default function SalesChart3D({
               )
             })}
           </div>
-
-          {/* The floor the bars stand on, laid flat at the baseline. */}
-          <div className="floor" style={{ height: depth, transform: `translateY(${depth / 2}px) rotateX(90deg)` }} />
-
         </div>
       </div>
 
-      <div className="axis">
-        {buckets.map((b, i) => (
-          <span key={i} className="axis-label num">{i % labelEvery === 0 ? b.label : ''}</span>
-        ))}
-      </div>
-
       <style jsx>{`
-        .chart3d {
-          padding: 2px 2px 0;
-          /* The stage is wider once it is rotated, and .content scrolls. Clip
-             the horizontal bleed only — overflow-y stays visible so a tooltip
-             above the tallest bar is not cut off. */
-          overflow-x: clip;
-        }
+        .chart3d { padding: 2px 2px 0 }
         .chart3d-head {
           display: flex; align-items: baseline; justify-content: space-between;
           gap: 10px; margin-bottom: 10px;
@@ -221,77 +227,64 @@ export default function SalesChart3D({
           background: #f1f5f9; border-radius: 99px; padding: 3px 10px;
         }
 
-        /* The perspective lives here and nothing between it and the faces may
-           flatten: no filter, no opacity animation on a transformed ancestor. */
-        .scene {
-          perspective: 1100px;
-          perspective-origin: 50% 42%;
-          padding: 20px 12px 0;
-        }
-        .stage {
-          position: relative;
-          height: 190px;
-          transform-style: preserve-3d;
-          transform: rotateX(${BASE_TILT_X}deg) rotateY(${BASE_TILT_Y}deg);
-          transition: transform 0.25s ease-out;
+        .plot { display: flex; gap: 8px }
+        .yaxis { width: 46px; flex: none; position: relative; height: 190px }
+        .yval {
+          position: absolute; inset-inline-end: 0; transform: translateY(50%);
+          font-size: 9.5px; color: #b4c0cf; font-weight: 600; white-space: nowrap;
         }
 
-        .grid { position: absolute; inset: 0; transform-style: preserve-3d }
-        .gridline {
-          position: absolute; left: 0; right: 0; height: 1px;
-          background: #eef2f7;
-        }
-        .gridval {
-          position: absolute; inset-inline-start: 0; bottom: 2px;
-          font-size: 9.5px; color: #cbd5e1; font-weight: 600;
-        }
+        .stage { position: relative; flex: 1; min-width: 0; height: 190px; padding-bottom: 26px }
+        .grid { position: absolute; inset-inline-start: 0; bottom: 26px }
+        .gline { position: absolute; left: 0; right: 0; height: 1px; background: #eef2f7 }
+        .gline.base { background: #dde3ea }
 
         .track {
-          position: absolute; inset: 0;
-          display: flex; align-items: flex-end; justify-content: space-around;
-          transform-style: preserve-3d;
+          position: absolute; inset-inline-start: 0; bottom: 26px;
+          display: flex; align-items: flex-end;
         }
         .cell {
           flex: 1 1 0; min-width: 0; height: 100%;
           display: flex; align-items: flex-end; justify-content: center;
           position: relative;
-          transform-style: preserve-3d;
         }
 
         .bar {
           position: relative;
-          transform-style: preserve-3d;
-          /* Height, not transform — a running transform animation flattens
-             every child face back into one plane. */
           transition: height 0.62s cubic-bezier(0.2, 0.75, 0.25, 1);
         }
-        .face { position: absolute; border-radius: 1px }
         .front {
-          inset: 0;
-          background: linear-gradient(180deg, #22c99a 0%, ${GREEN} 55%, #12876330 100%);
-          background-color: ${GREEN};
+          position: absolute; inset: 0;
+          background: linear-gradient(180deg, #29cd9c, #14976e);
         }
+        /* Skewed 45deg about its bottom-left corner, which turns the rectangle
+           into exactly the parallelogram the extrusion needs — the same shape
+           whatever the bar's height or position. */
         .top {
-          top: 0; left: 0; width: 100%;
-          background: #55e0b7;
+          position: absolute; bottom: 100%; left: 0; width: 100%;
+          background: #66e8c1;
+          transform: skewX(-45deg);
+          transform-origin: bottom left;
         }
         .side {
-          top: 0; left: 0; height: 100%;
-          background: #0f7a5c;
+          position: absolute; top: 0; left: 100%; height: 100%;
+          background: #0d7d5c;
+          transform: skewY(-45deg);
+          transform-origin: bottom left;
         }
-        .bar.hot .front { background-color: #0ea87c }
-        .bar.hot .top { background: #7df0cd }
-        .bar.hot .side { background: #0b6349 }
+        .bar.hot .front { background: linear-gradient(180deg, #12b287, #0a7d5b) }
+        .bar.hot .top { background: #8df3d5 }
+        .bar.hot .side { background: #085f45 }
 
-        .floor {
-          position: absolute; bottom: 0; left: 1.5%; width: 97%;
-          background: linear-gradient(180deg, #e2e8f0, #f8fafc);
+        .xlabel {
+          position: absolute; top: 100%; left: 50%; margin-top: 8px;
+          transform: translateX(-50%);
+          font-size: 9.5px; color: #9ca3af; font-weight: 600; white-space: nowrap;
         }
 
         .tip {
-          position: absolute; bottom: 100%; left: 50%;
-          transform: translateX(-50%) translateZ(40px);
-          margin-bottom: 8px;
+          position: absolute; left: 50%; transform: translateX(-50%);
+          margin-bottom: 12px;
           background: #0b0f1a; color: #fff;
           border-radius: 8px; padding: 6px 10px;
           white-space: nowrap; pointer-events: none;
@@ -301,23 +294,13 @@ export default function SalesChart3D({
         .tip-day { font-size: 10px; opacity: 0.7; margin-bottom: 2px }
         .tip-val { font-size: 12.5px; font-weight: 700 }
 
-        .axis {
-          display: flex; justify-content: space-around;
-          margin-top: 9px; padding: 0 4px;
-        }
-        .axis-label {
-          flex: 1 1 0; min-width: 0; text-align: center;
-          font-size: 9.5px; color: #9ca3af; font-weight: 600;
-          white-space: nowrap; overflow: hidden;
-        }
-
         @media (max-width: 640px) {
-          .stage { height: 150px }
+          .stage, .yaxis { height: 150px }
           .chart3d-total { font-size: 18px }
+          .yaxis { width: 34px }
         }
         @media (prefers-reduced-motion: reduce) {
           .bar { transition: none }
-          .stage { transition: none }
         }
       `}</style>
     </div>
