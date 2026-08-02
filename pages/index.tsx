@@ -697,6 +697,18 @@ export default function Landing() {
               </div>
             ))}
             <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 18 }}>قانوني</div>
+              {[['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع'], ['/privacy', 'سياسة الخصوصية']].map(([href, label]) => (
+                <div key={href} style={{ marginBottom: 12 }}>
+                  <a href={href}
+                    style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', transition: 'color 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.75)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}>{label}</a>
+                </div>
+              ))}
+            </div>
+
+            <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 18 }}>تواصل</div>
               <a href={WHATSAPP} target="_blank" rel="noopener noreferrer"
                 style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 7 }}

@@ -147,6 +147,15 @@ export default function BillingPage({ user, payment }: { user: any; payment: Pay
           </div>
         )}
 
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginTop: 18 }}>
+          {[['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع'], ['/privacy', 'سياسة الخصوصية']].map(([href, label]) => (
+            <a key={href} href={href} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 12.5, color: '#64748b', textDecoration: 'none', borderBottom: '1px solid #e2e8f0', paddingBottom: 1 }}>
+              {label}
+            </a>
+          ))}
+        </div>
+
         {isActive && (
           <div style={{ textAlign: 'center', fontSize: 14, color: GREEN, fontWeight: 600, padding: 16, background: 'rgba(22,166,121,.06)', border: '1.5px solid rgba(22,166,121,.2)', borderRadius: 14 }}>
             شكراً لاشتراكك — لأي استفسار{' '}
