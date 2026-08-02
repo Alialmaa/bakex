@@ -108,3 +108,28 @@ describe('the price', () => {
     assert.equal(paymentConfig().price, YEARLY_PRICE)
   })
 })
+
+describe('the support address', () => {
+  const clear = () => { delete process.env.SUPPORT_EMAIL }
+
+  test('falls back to the configured default when unset', () => {
+    clear()
+    assert.equal(paymentConfig().email, 'support@hazvix.tech')
+  })
+
+  test('uses the environment value when it is an address', () => {
+    process.env.SUPPORT_EMAIL = 'Hello@Example.COM'
+    assert.equal(paymentConfig().email, 'hello@example.com', 'lowercased')
+    clear()
+  })
+
+  test('ignores anything that is not an address', () => {
+    // The policy pages print this as the only written way to reach us, so a
+    // broken mailto is a dead end for someone exercising a data right.
+    for (const junk of ['', '   ', 'support', 'support@', '@example.com', 'a@b', 'two words@x.com']) {
+      process.env.SUPPORT_EMAIL = junk
+      assert.equal(paymentConfig().email, 'support@hazvix.tech', junk)
+    }
+    clear()
+  })
+})
