@@ -4,12 +4,13 @@ import { paymentConfig } from '../lib/payment'
 
 const UPDATED = '٣١ يوليو ٢٠٢٦'
 
-export default function Privacy({ whatsapp }: { whatsapp: string }) {
+export default function Privacy({ whatsapp, email }: { whatsapp: string; email: string }) {
   return (
     <LegalPage
       title="سياسة الخصوصية"
       updated={UPDATED}
       whatsapp={whatsapp}
+      email={email}
       intro="نجمع أقل ما يلزم لتشغيل النظام، ولا نبيع بياناتك ولا نستخدمها في الإعلانات. هذه الصفحة تشرح ما نجمعه بالضبط، ولماذا، وأين يُحفَظ."
     >
       <div className="legal-body">
@@ -126,7 +127,7 @@ export default function Privacy({ whatsapp }: { whatsapp: string }) {
             <li><strong>نسخة</strong> من بياناتك بصيغة يمكن قراءتها.</li>
             <li><strong>الحذف</strong>، ويُنفَّذ خلال ٣٠ يوماً عدا ما يلزم الاحتفاظ به نظاماً.</li>
           </ul>
-          <p>راسلنا على واتساب من الرقم المسجّل في حسابك وننفّذ الطلب.</p>
+          <p>راسلنا على البريد الإلكتروني أو واتساب من الحساب المسجّل، وننفّذ الطلب خلال المدة الموضّحة أعلاه.</p>
         </Section>
 
         <Section title="٩. الأطفال">
@@ -146,5 +147,5 @@ export default function Privacy({ whatsapp }: { whatsapp: string }) {
 }
 
 export const getStaticProps: GetStaticProps = async () => ({
-  props: { whatsapp: paymentConfig().whatsapp },
+  props: { whatsapp: paymentConfig().whatsapp, email: paymentConfig().email },
 })

@@ -28,6 +28,7 @@ unset — the page degrades to the next payment method rather than breaking:
 | `PAYMENT_LINK_URL` | Hosted payment link. **https only**; anything else is ignored and the card button disappears. |
 | `BANK_NAME`, `BANK_IBAN`, `BANK_ACCOUNT_NAME` | Bank transfer details. Shown only when **all three** are set — partial details cannot be paid into. |
 | `SUPPORT_WHATSAPP` | Support number. Non-digits are stripped, so a pasted `+966 55 …` works. |
+| `SUPPORT_EMAIL` | Support address on the policy pages. Anything that is not an address falls back to the default rather than rendering a broken `mailto:`. |
 
 The subscription is a single charge once a year, so this deliberately has no
 recurring billing, no stored cards and no webhooks. A payment link is enough

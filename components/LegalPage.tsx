@@ -35,7 +35,7 @@ export function Section({ title, children }: { title: string; children: ReactNod
 }
 
 export default function LegalPage({
-  title, updated, intro, children, whatsapp,
+  title, updated, intro, children, whatsapp, email,
 }: {
   title: string
   /** The date the text last actually changed, not today's date. */
@@ -43,6 +43,7 @@ export default function LegalPage({
   intro?: string
   children: ReactNode
   whatsapp: string
+  email: string
 }) {
   return (
     <div dir="rtl" className="wrap">
@@ -65,12 +66,19 @@ export default function LegalPage({
 
         <div className="contact">
           <div className="contact-title">للتواصل</div>
-          <p>
-            لأي استفسار بخصوص هذه الصفحة أو لطلب يتعلق ببياناتك، راسلنا على واتساب:{' '}
-            <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer" className="num">
-              +{whatsapp}
-            </a>
-          </p>
+          <p>لأي استفسار بخصوص هذه الصفحة أو لطلب يتعلق ببياناتك:</p>
+          <ul className="channels">
+            <li>
+              البريد الإلكتروني:{' '}
+              <a href={`mailto:${email}`} dir="ltr">{email}</a>
+            </li>
+            <li>
+              واتساب:{' '}
+              <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer" className="num" dir="ltr">
+                +{whatsapp}
+              </a>
+            </li>
+          </ul>
         </div>
 
         <nav className="others">
@@ -120,6 +128,10 @@ export default function LegalPage({
           border-radius: 12px; padding: 16px 18px; margin-top: 20px;
         }
         .contact-title { font-size: 14px; font-weight: 700; margin-bottom: 6px }
+        .contact p { font-size: 14px; margin: 0 0 8px; color: #374151 }
+        .channels { margin: 0; padding-inline-start: 20px }
+        .channels li { font-size: 14px; line-height: 2; color: #374151 }
+        .channels a { color: ${GREEN} }
 
         .others { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px }
         .other {

@@ -4,12 +4,13 @@ import { paymentConfig, YEARLY_PRICE } from '../lib/payment'
 
 const UPDATED = '٣١ يوليو ٢٠٢٦'
 
-export default function Terms({ whatsapp, price }: { whatsapp: string; price: number }) {
+export default function Terms({ whatsapp, email, price }: { whatsapp: string; email: string; price: number }) {
   return (
     <LegalPage
       title="الشروط والأحكام"
       updated={UPDATED}
       whatsapp={whatsapp}
+      email={email}
       intro="هذه الشروط تنظّم استخدامك لنظام Bakex. باستخدامك النظام أو تسجيلك فيه فإنك توافق عليها."
     >
       <div className="legal-body">
@@ -161,5 +162,5 @@ export default function Terms({ whatsapp, price }: { whatsapp: string; price: nu
 }
 
 export const getStaticProps: GetStaticProps = async () => ({
-  props: { whatsapp: paymentConfig().whatsapp, price: YEARLY_PRICE },
+  props: { whatsapp: paymentConfig().whatsapp, email: paymentConfig().email, price: YEARLY_PRICE },
 })

@@ -711,10 +711,16 @@ export default function Landing() {
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 18 }}>تواصل</div>
               <a href={WHATSAPP} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 7 }}
+                style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', display: 'block', marginBottom: 12 }}
                 onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.75)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}>
                 واتساب
+              </a>
+              <a href="mailto:support@hazvix.tech" dir="ltr"
+                style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', display: 'block' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.75)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}>
+                support@hazvix.tech
               </a>
             </div>
           </div>

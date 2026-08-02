@@ -17,11 +17,24 @@ export interface PaymentConfig {
   link: string | null
   bank: { name: string; iban: string; accountName: string } | null
   whatsapp: string
+  /** Support address, shown on the policy pages and in the footer. */
+  email: string
 }
 
 export const YEARLY_PRICE = 2500
 
 const WHATSAPP_DEFAULT = '966559219189'
+const EMAIL_DEFAULT = 'support@hazvix.tech'
+
+/**
+ * A misconfigured address is worse than the default: the policy pages print it
+ * as the only written way to reach us, and a broken mailto is a dead end for
+ * someone exercising a data right.
+ */
+function safeEmail(raw?: string): string {
+  const v = raw?.trim().toLowerCase()
+  return v && /^[^\s@]+@[^\s@.]+\.[^\s@]+$/.test(v) ? v : EMAIL_DEFAULT
+}
 
 /** Only https links are accepted — a payment link is where money goes. */
 function safeLink(raw?: string): string | null {
@@ -51,6 +64,7 @@ export function paymentConfig(): PaymentConfig {
     // Partial bank details are worse than none — a payer cannot act on them.
     bank: name && iban && accountName ? { name, iban: formatIban(iban), accountName } : null,
     whatsapp: process.env.SUPPORT_WHATSAPP?.replace(/\D/g, '') || WHATSAPP_DEFAULT,
+    email: safeEmail(process.env.SUPPORT_EMAIL),
   }
 }
 

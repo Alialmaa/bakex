@@ -4,12 +4,13 @@ import { paymentConfig, YEARLY_PRICE } from '../lib/payment'
 
 const UPDATED = '٣١ يوليو ٢٠٢٦'
 
-export default function Refund({ whatsapp, price }: { whatsapp: string; price: number }) {
+export default function Refund({ whatsapp, email, price }: { whatsapp: string; email: string; price: number }) {
   return (
     <LegalPage
       title="سياسة الاسترجاع والإلغاء"
       updated={UPDATED}
       whatsapp={whatsapp}
+      email={email}
       intro="نعطيك ٣٠ يوماً تجريبية كاملة قبل أن تدفع ريالاً واحداً، حتى تعرف النظام قبل أن تلتزم. وإن دفعت ثم وجدته لا يناسبك، هذه هي القواعد."
     >
       <div className="legal-body">
@@ -48,7 +49,7 @@ export default function Refund({ whatsapp, price }: { whatsapp: string; price: n
 
         <Section title="٤. كيف تطلب الاسترجاع">
           <ol>
-            <li>راسلنا على واتساب من الرقم المسجّل في حسابك.</li>
+            <li>راسلنا على البريد الإلكتروني أو واتساب من الحساب المسجّل.</li>
             <li>اذكر اسم المنشأة وتاريخ الدفع، وما إذا كنت ستُعيد الجهاز.</li>
             <li>نؤكد استلام الطلب خلال يوم عمل واحد.</li>
           </ol>
@@ -92,5 +93,5 @@ export default function Refund({ whatsapp, price }: { whatsapp: string; price: n
 }
 
 export const getStaticProps: GetStaticProps = async () => ({
-  props: { whatsapp: paymentConfig().whatsapp, price: YEARLY_PRICE },
+  props: { whatsapp: paymentConfig().whatsapp, email: paymentConfig().email, price: YEARLY_PRICE },
 })
