@@ -2,6 +2,8 @@ import { useRouter } from 'next/router'
 import { useEffect, useRef, useState } from 'react'
 import { fmtDateLong } from '../lib/datetime'
 import { useTilt } from '../lib/useTilt'
+import Seo from '../components/Seo'
+import { productJsonLd } from '../lib/seo'
 
 const G = '#16a679'
 const GD = '#0d7a5a'
@@ -119,6 +121,14 @@ export default function Landing() {
 
   return (
     <div dir="rtl" style={{ fontFamily: 'var(--font-ui)', color: DARK, background: '#fff', overflowX: 'hidden' }}>
+      <Seo page="home" path="/" />
+      {/* Lets a search result carry the price. Only what the pricing section
+          really says goes in here — an invented rating is a manual penalty. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(YEARLY_PRICE)) }}
+      />
+
 
       <style jsx>{`
         .scene { perspective: 1200px; }

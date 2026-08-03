@@ -4,6 +4,7 @@ import type { GetServerSideProps } from 'next'
 import { hasValidSession } from '../lib/auth'
 import { useLang } from '../lib/useLang'
 import { useTilt } from '../lib/useTilt'
+import Seo from '../components/Seo'
 
 const G = '#16a679'
 const GD = '#0d7a5a'
@@ -110,6 +111,8 @@ export default function LoginPage() {
 
   return (
     <div dir={isAR ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', display: 'flex', fontFamily: 'var(--font-ui)' }}>
+      <Seo page="login" path="/login" />
+
 
       <style jsx>{`
         .scene { perspective: 1000px; }

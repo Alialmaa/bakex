@@ -1,6 +1,7 @@
-import Head from 'next/head'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import Seo from './Seo'
+import type { SeoKey } from '../lib/seo'
 
 /**
  * The shell the three policy pages share.
@@ -35,9 +36,12 @@ export function Section({ title, children }: { title: string; children: ReactNod
 }
 
 export default function LegalPage({
-  title, updated, intro, children, whatsapp, email,
+  title, seo, path, updated, intro, children, whatsapp, email,
 }: {
   title: string
+  /** Which entry in PAGE_SEO describes this page. */
+  seo: SeoKey
+  path: string
   /** The date the text last actually changed, not today's date. */
   updated: string
   intro?: string
@@ -47,10 +51,7 @@ export default function LegalPage({
 }) {
   return (
     <div dir="rtl" className="wrap">
-      <Head>
-        <title>{`${title} — Bakex`}</title>
-        <meta name="description" content={`${title} لنظام Bakex لإدارة المخابز.`} />
-      </Head>
+      <Seo page={seo} path={path} />
 
       <header className="top">
         <Link href="/" className="brand">Bake<span style={{ color: GREEN }}>x</span></Link>

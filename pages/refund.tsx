@@ -8,6 +8,8 @@ export default function Refund({ whatsapp, email, price }: { whatsapp: string; e
   return (
     <LegalPage
       title="سياسة الاسترجاع والإلغاء"
+      seo="refund"
+      path="/refund"
       updated={UPDATED}
       whatsapp={whatsapp}
       email={email}

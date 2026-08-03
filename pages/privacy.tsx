@@ -8,6 +8,8 @@ export default function Privacy({ whatsapp, email }: { whatsapp: string; email: 
   return (
     <LegalPage
       title="سياسة الخصوصية"
+      seo="privacy"
+      path="/privacy"
       updated={UPDATED}
       whatsapp={whatsapp}
       email={email}

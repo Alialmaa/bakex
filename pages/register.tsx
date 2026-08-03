@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { useTilt } from '../lib/useTilt'
+import Seo from '../components/Seo'
 
 const GREEN = '#16a679'
 const DARK = '#0b0f1a'
@@ -104,6 +105,8 @@ export default function RegisterPage() {
 
   return (
     <div dir="rtl" style={{ minHeight: '100vh', display: 'flex', fontFamily: 'var(--font-ui)' }}>
+      <Seo page="register" path="/register" />
+
 
       <style jsx>{`
         .scene { perspective: 1000px; }

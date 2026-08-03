@@ -29,6 +29,7 @@ unset — the page degrades to the next payment method rather than breaking:
 | `BANK_NAME`, `BANK_IBAN`, `BANK_ACCOUNT_NAME` | Bank transfer details. Shown only when **all three** are set — partial details cannot be paid into. |
 | `SUPPORT_WHATSAPP` | Support number. Non-digits are stripped, so a pasted `+966 55 …` works. |
 | `SUPPORT_EMAIL` | Support address on the policy pages. Anything that is not an address falls back to the default rather than rendering a broken `mailto:`. |
+| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | Search Console token. `NEXT_PUBLIC_` on purpose — a server-only value renders during SSR and vanishes on hydration. |
 
 The subscription is a single charge once a year, so this deliberately has no
 recurring billing, no stored cards and no webhooks. A payment link is enough
@@ -196,6 +197,21 @@ cannot find, so a misspelt material does not fail — it understates that recipe
 cost, its margin and every total above it. The preview lists those names before
 anything is saved; the route goes through `createRecipe`/`updateRecipe` and
 `requireIngredients`, so an imported recipe is identical to a typed one.
+
+## Search engines
+
+`lib/seo.ts` holds every title and description, and `PUBLIC_PATHS` is the list
+of pages a crawler may see. `pages/sitemap.xml.ts` and `pages/robots.txt.ts` are
+generated from that same list, so **a page cannot be public and missing from the
+sitemap** — a static file in `public/` goes stale the first time someone adds a
+page and nothing fails.
+
+`robots.txt` refuses everything unless the request's `Host` matches `APP_URL`,
+so preview deployments do not compete with production for the same words.
+
+The landing page carries `SoftwareApplication` JSON-LD with the real price.
+**Never add a rating or a review count to it** — fabricated review markup is a
+manual action, not a ranking tweak.
 
 ## Post-deploy smoke test
 

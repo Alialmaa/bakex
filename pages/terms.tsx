@@ -8,6 +8,8 @@ export default function Terms({ whatsapp, email, price }: { whatsapp: string; em
   return (
     <LegalPage
       title="الشروط والأحكام"
+      seo="terms"
+      path="/terms"
       updated={UPDATED}
       whatsapp={whatsapp}
       email={email}
